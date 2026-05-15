@@ -1,8 +1,8 @@
 {
-  "version": "1.0.0",
-  "downloadUrl": "https://github.com/BlissBlender/Charon/releases/download/v1.0.0/Charon-1.0.0.exe",
-  "releaseUrl": "https://github.com/BlissBlender/Charon/releases/tag/v1.0.0",
-  "sha256": "ca8ed984dfa9fea0256c34f9cbf1ab9773218d670a2e6b87ae047a1e8de3b083",
-  "notes": "Initial public Charon portable release.",
-  "publishedAt": "2026-05-15T13:58:52.8240408Z"
+  "version": "1.0.1",
+  "downloadUrl": "https://github.com/BlissBlender/Charon/releases/download/v1.0.1/Charon-1.0.1.exe",
+  "releaseUrl": "https://github.com/BlissBlender/Charon/releases/tag/v1.0.1",
+  "sha256": "cc709bc4fa6bcf7d0af0c01ca044948ed5385da22e1a979f874ae25da43cebb2",
+  "notes": "Adds automatic in-app update download, verification, replacement, and relaunch.",
+  "publishedAt": "2026-05-15T15:03:00Z"
 }
