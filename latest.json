@@ -1,8 +1,8 @@
 {
-  "version": "1.0.2",
-  "downloadUrl": "https://github.com/BlissBlender/Charon/releases/download/v1.0.2/Charon-1.0.2.exe",
-  "releaseUrl": "https://github.com/BlissBlender/Charon/releases/tag/v1.0.2",
-  "sha256": "f97ff8291fafd8350bb48d1aa9f11871dcfca63a8492fa34b7cd2907c7b0b36c",
-  "notes": "Fixes first-run Steam auto-detect freezing by keeping setup detection lightweight.",
-  "publishedAt": "2026-05-15T15:34:00Z"
+  "version": "1.0.3",
+  "downloadUrl": "https://github.com/BlissBlender/Charon/releases/download/v1.0.3/Charon-1.0.3.exe",
+  "releaseUrl": "https://github.com/BlissBlender/Charon/releases/tag/v1.0.3",
+  "sha256": "676b56a16f701026cd8be4b889960e764253d700627c6f866a3b3b569c56138c",
+  "notes": "Improves stability, persistent storage across moved exes, faster startup, safer update checks, and lighter first-run Steam detection.",
+  "publishedAt": "2026-05-16T04:30:00Z"
 }

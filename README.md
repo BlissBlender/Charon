@@ -6,11 +6,11 @@ Charon is a portable Windows desktop app for installing Steam manifest packages 
 
 The current portable build is:
 
-- Version: `1.0.2`
-- File: `Charon-1.0.2.exe`
-- SHA-256: `f97ff8291fafd8350bb48d1aa9f11871dcfca63a8492fa34b7cd2907c7b0b36c`
+- Version: `1.0.3`
+- File: `Charon-1.0.3.exe`
+- SHA-256: `676b56a16f701026cd8be4b889960e764253d700627c6f866a3b3b569c56138c`
 
-Upload the exe to a GitHub Release tagged `v1.0.2` with the asset name `Charon-1.0.2.exe`.
+Upload the exe to a GitHub Release tagged `v1.0.3` with the asset name `Charon-1.0.3.exe`.
 
 ## Updates
 
