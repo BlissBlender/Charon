@@ -1,8 +1,8 @@
 {
-  "version": "1.0.4",
-  "downloadUrl": "https://github.com/BlissBlender/Charon/releases/download/v1.0.4/Charon-1.0.4.exe",
-  "releaseUrl": "https://github.com/BlissBlender/Charon/releases/tag/v1.0.4",
-  "sha256": "e14869c8da5c0ccabef67295e7d26e58a3f6a549f5ab9c2e144a745a9f96d2e8",
-  "notes": "Fixes hidden self-update relaunch, improves old CharonData migration, and keeps app data in LocalAppData.",
-  "publishedAt": "2026-05-16T04:55:00Z"
+  "version": "1.0.5",
+  "downloadUrl": "https://github.com/BlissBlender/Charon/releases/download/v1.0.5/Charon-1.0.5.exe",
+  "releaseUrl": "https://github.com/BlissBlender/Charon/releases/tag/v1.0.5",
+  "sha256": "00662291f4615949bea43c9caae923bbd42a7c3e8ebf7279c6438a1e244ba498",
+  "notes": "Uses the GitHub API for update metadata to avoid stale raw-cache update checks.",
+  "publishedAt": "2026-05-16T05:05:00Z"
 }
