@@ -1,8 +1,8 @@
 {
-  "version": "1.0.3",
-  "downloadUrl": "https://github.com/BlissBlender/Charon/releases/download/v1.0.3/Charon-1.0.3.exe",
-  "releaseUrl": "https://github.com/BlissBlender/Charon/releases/tag/v1.0.3",
-  "sha256": "676b56a16f701026cd8be4b889960e764253d700627c6f866a3b3b569c56138c",
-  "notes": "Improves stability, persistent storage across moved exes, faster startup, safer update checks, and lighter first-run Steam detection.",
-  "publishedAt": "2026-05-16T04:30:00Z"
+  "version": "1.0.4",
+  "downloadUrl": "https://github.com/BlissBlender/Charon/releases/download/v1.0.4/Charon-1.0.4.exe",
+  "releaseUrl": "https://github.com/BlissBlender/Charon/releases/tag/v1.0.4",
+  "sha256": "e14869c8da5c0ccabef67295e7d26e58a3f6a549f5ab9c2e144a745a9f96d2e8",
+  "notes": "Fixes hidden self-update relaunch, improves old CharonData migration, and keeps app data in LocalAppData.",
+  "publishedAt": "2026-05-16T04:55:00Z"
 }
