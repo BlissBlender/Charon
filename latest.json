@@ -1,8 +1,8 @@
 {
-  "version": "1.0.6",
-  "downloadUrl": "https://github.com/BlissBlender/Charon/releases/download/v1.0.6/Charon-1.0.6.exe",
-  "releaseUrl": "https://github.com/BlissBlender/Charon/releases/tag/v1.0.6",
-  "sha256": "611e0da78383318611507ff2bfd0958a2e19cdcff20f8eb9d451c53d09025e8",
-  "notes": "Uses the Charon Lua repository first, falls back to the bundled GameGen source, and fixes installed-manifest removal refresh.",
-  "publishedAt": "2026-05-16T15:40:00Z"
+  "version": "1.0.7",
+  "downloadUrl": "https://github.com/BlissBlender/Charon/releases/download/v1.0.7/Charon-1.0.7.exe",
+  "releaseUrl": "https://github.com/BlissBlender/Charon/releases/tag/v1.0.7",
+  "sha256": "851340883a2afa873c9d5220b67678ab25fb7e55cd6eedf2d9ef1fa5182e939b",
+  "notes": "Adds the second Charon Lua repository folder as a fallback before the bundled GameGen source.",
+  "publishedAt": "2026-05-17T10:06:26Z"
 }
