@@ -1,8 +1,8 @@
 {
-  "version": "1.0.7",
-  "downloadUrl": "https://github.com/BlissBlender/Charon/releases/download/v1.0.7/Charon-1.0.7.exe",
-  "releaseUrl": "https://github.com/BlissBlender/Charon/releases/tag/v1.0.7",
-  "sha256": "851340883a2afa873c9d5220b67678ab25fb7e55cd6eedf2d9ef1fa5182e939b",
-  "notes": "Adds the second Charon Lua repository folder as a fallback before the bundled GameGen source.",
-  "publishedAt": "2026-05-17T10:06:26Z"
+  "version": "1.0.8",
+  "downloadUrl": "https://github.com/BlissBlender/Charon/releases/download/v1.0.8/Charon-1.0.8.exe",
+  "releaseUrl": "https://github.com/BlissBlender/Charon/releases/tag/v1.0.8",
+  "sha256": "c3577b34af1d0c031d64fe07a8d31f586eca0a51762e2cee0d5ad896951f607b",
+  "notes": "Adds Charon Database 1 and Database 2 with indexed loose Lua, loose manifests, ZIP packages, and GameGen fallback.",
+  "publishedAt": "2026-05-20T05:38:33Z"
 }
