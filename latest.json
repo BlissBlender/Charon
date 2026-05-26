@@ -1,8 +1,8 @@
 {
-  "version": "1.0.11",
-  "downloadUrl": "https://github.com/BlissBlender/Charon/releases/download/v1.0.11/Charon-1.0.11.exe",
-  "releaseUrl": "https://github.com/BlissBlender/Charon/releases/tag/v1.0.11",
-  "sha256": "69cfa07da5f362dd4c75b018fa798dd836e22a6230ce795d0d5f76bec0a5adcf",
-  "notes": "Thumbnail cache fix: only successful Steam artwork is cached for 24 hours, placeholders are never cached, and failed artwork retries on future renders.",
-  "publishedAt": "2026-05-26T17:40:00Z"
+  "version": "1.0.12",
+  "downloadUrl": "https://github.com/BlissBlender/Charon/releases/download/v1.0.12/Charon-1.0.12.exe",
+  "releaseUrl": "https://github.com/BlissBlender/Charon/releases/tag/v1.0.12",
+  "sha256": "da08a6ab58aa2a989b5dc388d518ed9692a6a915a7ab94dda69ef08b58854945",
+  "notes": "Hero banner fix: selected-game artwork now loads immediately with in-place retry, while placeholders remain uncached.",
+  "publishedAt": "2026-05-26T17:48:00Z"
 }
