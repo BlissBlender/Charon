@@ -1,8 +1,8 @@
 {
-  "version": "1.0.12",
-  "downloadUrl": "https://github.com/BlissBlender/Charon/releases/download/v1.0.12/Charon-1.0.12.exe",
-  "releaseUrl": "https://github.com/BlissBlender/Charon/releases/tag/v1.0.12",
-  "sha256": "da08a6ab58aa2a989b5dc388d518ed9692a6a915a7ab94dda69ef08b58854945",
-  "notes": "Hero banner fix: selected-game artwork now loads immediately with in-place retry, while placeholders remain uncached.",
-  "publishedAt": "2026-05-26T17:48:00Z"
+  "version": "1.0.13",
+  "downloadUrl": "https://github.com/BlissBlender/Charon/releases/download/v1.0.13/Charon-1.0.13.exe",
+  "releaseUrl": "https://github.com/BlissBlender/Charon/releases/tag/v1.0.13",
+  "sha256": "14d3ce4eec6d64f7e76262da8f64c91d8e1a02bbab2926e6bdda141f653357f4",
+  "notes": "Steam banner resolver update: validated artwork now powers Search, Installed, Tracked Manifests, and Game Details with refresh controls.",
+  "publishedAt": "2026-05-26T18:28:10Z"
 }
