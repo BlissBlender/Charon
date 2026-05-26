@@ -1,8 +1,8 @@
 {
-  "version": "1.0.10",
-  "downloadUrl": "https://github.com/BlissBlender/Charon/releases/download/v1.0.10/Charon-1.0.10.exe",
-  "releaseUrl": "https://github.com/BlissBlender/Charon/releases/tag/v1.0.10",
-  "sha256": "f18c0c4a161c36e3af7956af183ad138794d407293c18b9690b76065fb2aa0bf",
-  "notes": "Production UI/UX stability update with robust game thumbnails, installed-game deduplication, safer installs, and required startup update prompts.",
-  "publishedAt": "2026-05-26T16:55:00Z"
+  "version": "1.0.11",
+  "downloadUrl": "https://github.com/BlissBlender/Charon/releases/download/v1.0.11/Charon-1.0.11.exe",
+  "releaseUrl": "https://github.com/BlissBlender/Charon/releases/tag/v1.0.11",
+  "sha256": "69cfa07da5f362dd4c75b018fa798dd836e22a6230ce795d0d5f76bec0a5adcf",
+  "notes": "Thumbnail cache fix: only successful Steam artwork is cached for 24 hours, placeholders are never cached, and failed artwork retries on future renders.",
+  "publishedAt": "2026-05-26T17:40:00Z"
 }
