@@ -1,8 +1,8 @@
 {
-  "version": "1.0.9",
-  "downloadUrl": "https://github.com/BlissBlender/Charon/releases/download/v1.0.9/Charon-1.0.9.exe",
-  "releaseUrl": "https://github.com/BlissBlender/Charon/releases/tag/v1.0.9",
-  "sha256": "31b751f9a3d21fc2754c7527f0e8fddf418cc5203f9c373ee219ac2927ba98cf",
-  "notes": "Direct App ID Lua and ZIP files are now checked before index mappings; index mappings are used for random-name ZIPs and loose manifest links.",
-  "publishedAt": "2026-05-22T05:09:39Z"
+  "version": "1.0.10",
+  "downloadUrl": "https://github.com/BlissBlender/Charon/releases/download/v1.0.10/Charon-1.0.10.exe",
+  "releaseUrl": "https://github.com/BlissBlender/Charon/releases/tag/v1.0.10",
+  "sha256": "f18c0c4a161c36e3af7956af183ad138794d407293c18b9690b76065fb2aa0bf",
+  "notes": "Production UI/UX stability update with robust game thumbnails, installed-game deduplication, safer installs, and required startup update prompts.",
+  "publishedAt": "2026-05-26T16:55:00Z"
 }
