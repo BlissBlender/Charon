@@ -1,8 +1,8 @@
 {
-    "version":  "1.0.15",
-    "downloadUrl":  "https://github.com/BlissBlender/Charon/releases/download/v1.0.15/Charon-1.0.15.exe",
-    "releaseUrl":  "https://github.com/BlissBlender/Charon/releases/tag/v1.0.15",
-    "notes":  "Adds automatic Lua manifest enrichment from ManifestVault, external vault backfill via the Charon bot, cleaner important-only activity logs, and a roomier desktop layout.",
-    "sha256":  "91c1935458d4d5d0be915869299ae9c0731f57b39a8a0a4e0fd6cfcdca3fc475",
-    "publishedAt":  "2026-06-02T16:07:11Z"
+    "version":  "1.0.16",
+    "downloadUrl":  "https://github.com/BlissBlender/Charon/releases/download/v1.0.16/Charon-1.0.16.exe",
+    "releaseUrl":  "https://github.com/BlissBlender/Charon/releases/tag/v1.0.16",
+    "notes":  "Backfills manifest files already bundled inside external API ZIP packages into ManifestVault through the Charon bot Worker.",
+    "sha256":  "2f5879fea2909e0822d9a738502af8c988d4cca0f72e552d45877e47b66837b0",
+    "publishedAt":  "2026-06-02T17:21:46Z"
 }

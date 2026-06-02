@@ -1233,6 +1233,25 @@ async function enrichZipWithRequiredManifests(appId, zipBytes, sender) {
   }
 }
 
+function manifestFileNamesFromZip(zipBytes) {
+  try {
+    const zip = new AdmZip(zipBytes);
+    return uniqueStrings(zip.getEntries()
+      .filter((entry) => !entry.isDirectory && path.extname(entry.entryName).toLowerCase() === '.manifest')
+      .map((entry) => path.basename(entry.entryName)));
+  } catch {
+    return [];
+  }
+}
+
+function scheduleManifestVaultBackfills(fileNames) {
+  for (const fileName of uniqueStrings(fileNames)) {
+    if (/^\d+_\d+\.manifest$/i.test(fileName)) {
+      void scheduleBackfill({ type: 'manifest-vault', fileName });
+    }
+  }
+}
+
 function formatHttpError(response, bodyText) {
   let detail = '';
   try {
@@ -2844,6 +2863,9 @@ async function generateAndInstall(event, payload) {
     const enriched = await enrichZipWithRequiredManifests(appId, downloaded.zipBytes, event.sender);
     manifestSource = enriched.manifestSource;
     result = await installZipForApp({ appId, gameName, zipBytes: enriched.zipBytes });
+    if (downloaded.source?.type === 'gamegen') {
+      scheduleManifestVaultBackfills(manifestFileNamesFromZip(enriched.zipBytes));
+    }
   }
 
   if (downloaded.source?.type === 'gamegen') {
