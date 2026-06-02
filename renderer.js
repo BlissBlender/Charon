@@ -412,8 +412,15 @@ async function loadActivityLog() {
 }
 
 async function addActivity(message, kind = 'info') {
+  const text = String(message || '').trim();
+  if (!text) return;
+  const important = kind === 'error' ||
+    /install|inject|manifest|lua|depotcache|stplug|steam path|steam paths|settings saved|auto detected|removed|update|restart steam|quota/i.test(text);
+  const noisy = /searched steam|selected .*?\(\d+\)|refreshed game details|library refreshed|opened steam store|opened discord|opened charon website|search view cleared|selected manual zip/i.test(text);
+  if (!important || (kind === 'info' && noisy)) return;
+
   try {
-    const file = await window.charon.activity.add({ message, kind });
+    const file = await window.charon.activity.add({ message: text, kind });
     state.activityLog = file.records || [];
     renderActivityLog();
   } catch {
@@ -444,6 +451,24 @@ function renderActivityLog() {
       <strong>${escapeText(entry.message)}</strong>
     </article>
   `).join('');
+}
+
+function installTargetForPath(filePath, result) {
+  const normalized = String(filePath || '').replace(/[\\/]+/g, '/').toLowerCase();
+  const stPlugin = String(result?.stPluginPath || '').replace(/[\\/]+/g, '/').toLowerCase();
+  const depotCache = String(result?.depotCachePath || '').replace(/[\\/]+/g, '/').toLowerCase();
+  if (stPlugin && normalized.startsWith(stPlugin)) return 'Lua folder';
+  if (depotCache && normalized.startsWith(depotCache)) return 'Depot cache';
+  return 'Steam folder';
+}
+
+function describeInstalledFiles(result) {
+  const files = Array.isArray(result?.files) ? result.files : [];
+  if (!files.length) return 'No deployed files were reported.';
+  return files
+    .slice(0, 8)
+    .map((filePath) => `${installTargetForPath(filePath, result)}: ${filePath}`)
+    .join(' | ');
 }
 
 function fillSettingsForm(settings) {
@@ -831,8 +856,11 @@ async function installSelected() {
     const sourceLabel = result.sourceType === 'database-url' || result.sourceType === 'lua-url' || result.sourceId === 'github-lua'
       ? 'Used Charon Repo'
       : 'Used Other';
-    setStatus(els.installStatus, `${sourceLabel}. Installed ${result.fileCount} file(s). Restart Steam to reload changes.`, 'ok');
-    void addActivity(`${sourceLabel}: installed manifests for ${state.selectedGame.name} (${state.selectedGame.appId}).`, 'ok');
+    const manifestLabel = result.manifestSource
+      ? ` Manifest source: ${result.manifestSource}.`
+      : '';
+    setStatus(els.installStatus, `${sourceLabel}.${manifestLabel} Installed ${result.fileCount} file(s). Restart Steam to reload changes.`, 'ok');
+    void addActivity(`${sourceLabel}.${manifestLabel} Injected ${result.fileCount} file(s) for ${state.selectedGame.name} (${state.selectedGame.appId}). ${describeInstalledFiles(result)}`, 'ok');
     if (result.quota) {
       els.autoQuotaLabel.textContent = `Automatic installs: ${result.quota.remaining}/${result.quota.limit} left in 24h.`;
       els.autoQuotaLabel.classList.toggle('limit-reached', result.quota.remaining <= 0);
@@ -906,7 +934,7 @@ async function installManualZip() {
     els.manualFileLabel.textContent = 'No ZIP selected';
     await loadManifests();
     updateManualState();
-    void addActivity(`Manual ZIP installed for App ID ${appId}.`, 'ok');
+    void addActivity(`Manual ZIP injected ${result.fileCount} file(s) for App ID ${appId}. ${describeInstalledFiles(result)}`, 'ok');
   } catch (error) {
     setStatus(els.manualStatus, error.message || String(error), 'error');
     void addActivity(`Manual ZIP install failed for App ID ${appId}.`, 'error');

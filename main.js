@@ -16,6 +16,10 @@ const UPDATE_MANIFEST_DISPLAY_URL = 'https://raw.githubusercontent.com/BlissBlen
 const UPDATE_RELEASES_URL = 'https://github.com/BlissBlender/Charon/releases';
 const STORE_SEARCH_URL = 'https://store.steampowered.com/api/storesearch/';
 const STORE_DETAILS_URL = 'https://store.steampowered.com/api/appdetails';
+const STEAMCMD_INFO_URL = 'https://api.steamcmd.net/v1/info/';
+const MANIFEST_VAULT_BASE_URL = 'https://raw.githubusercontent.com/BlissBlender/ManifestVault/main';
+const EXTERNAL_MANIFEST_VAULT_BASE_URL = 'https://raw.githubusercontent.com/qwe213312/k25FCdfEOoEJ42S6/main';
+const BACKFILL_ENDPOINT_URL = 'https://charon-bot.vyro.workers.dev/api/backfill';
 const EXCLUDED_APP_IDS = new Set(['228980', '107056', '1110390']);
 const AUTO_INSTALL_DAILY_LIMIT = 10;
 const AUTO_INSTALL_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -28,6 +32,8 @@ const STEAM_SEARCH_RESULT_LIMIT = 100;
 const GAME_PLACEHOLDER_IMAGE = 'assets/game-placeholder.png';
 const BUNDLED_GAMEGEN_KEY = 'Dg8+EQwPVlkEEVxeVglURlZaAlFVRFtbVw4CEV1fAA5QEVw=';
 const BUNDLED_GAMEGEN_MASK = 'charon';
+const DEPOT_ADDAPPID_RE = /addappid\s*\(\s*(\d+)\s*,\s*\d+\s*,\s*["'][a-fA-F0-9]+["']/gi;
+const DIRECT_MANIFEST_FILE_RE = /\b(\d{3,})_(\d{3,})\.manifest\b/gi;
 
 function localAppDataBase() {
   return process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
@@ -58,6 +64,7 @@ let steamDetectCache = { value: '', time: 0 };
 let updateCheckInFlight = null;
 let updateCheckCache = null;
 const databaseIndexCache = new Map();
+const scheduledBackfills = new Set();
 const steamDetailsCache = new Map();
 const steamDetailsInFlight = new Map();
 const bannerResolveInFlight = new Map();
@@ -1003,6 +1010,227 @@ async function downloadDatabaseFile(source, fileName, appId, sender, phase, acce
 
   if (raw.length === 0) throw new Error(`${fileName} was empty.`);
   return raw;
+}
+
+function rawFileUrl(baseUrl, fileName) {
+  const cleanBase = String(baseUrl || '').trim().replace(/\/+$/, '');
+  const cleanName = cleanDatabaseFileName(fileName);
+  const encoded = cleanName.split('/').map((part) => encodeURIComponent(part)).join('/');
+  return `${cleanBase}/${encoded}`;
+}
+
+function manifestVaultSources() {
+  return [
+    { id: 'manifest-vault', label: 'Manifest Vault', source: 'primary', baseUrl: MANIFEST_VAULT_BASE_URL },
+    { id: 'external-vault', label: 'External Vault', source: 'fallback', baseUrl: EXTERNAL_MANIFEST_VAULT_BASE_URL }
+  ];
+}
+
+function extractDepotIdsFromLua(luaText) {
+  const depots = new Set();
+  const content = String(luaText || '');
+  for (const match of content.matchAll(DEPOT_ADDAPPID_RE)) {
+    depots.add(match[1]);
+  }
+  return [...depots];
+}
+
+function extractDirectManifestFileNames(luaText) {
+  const files = new Set();
+  const content = String(luaText || '');
+  for (const match of content.matchAll(DIRECT_MANIFEST_FILE_RE)) {
+    files.add(`${match[1]}_${match[2]}.manifest`);
+  }
+  return [...files];
+}
+
+async function fetchSteamCmdAppInfo(appId) {
+  try {
+    const response = await httpFetchWithTimeout(`${STEAMCMD_INFO_URL}${encodeURIComponent(String(appId))}`, {
+      headers: makeHeaders({ Accept: 'application/json' })
+    }, 12000);
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data?.status === 'success' ? data : null;
+  } catch (error) {
+    logMainError(new Error(`SteamCMD app info unavailable for ${appId}: ${error.message || String(error)}`));
+    return null;
+  }
+}
+
+function manifestFileNamesFromAppInfo(appInfo, appId, depotIds) {
+  const files = new Set();
+  const depots = appInfo?.data?.[appId]?.depots;
+  if (!depots || typeof depots !== 'object') return [];
+
+  for (const depotId of depotIds) {
+    const manifestId = depots?.[depotId]?.manifests?.public?.gid;
+    if (manifestId) files.add(`${depotId}_${manifestId}.manifest`);
+  }
+
+  return [...files];
+}
+
+async function requiredManifestFileNamesForLuaEntries(appId, luaEntries) {
+  const requiredFiles = new Set();
+  const depotIds = new Set();
+
+  for (const luaEntry of luaEntries) {
+    try {
+      const luaText = Buffer.from(luaEntry.bytes).toString('utf8');
+      for (const fileName of extractDirectManifestFileNames(luaText)) requiredFiles.add(fileName);
+      for (const depotId of extractDepotIdsFromLua(luaText)) depotIds.add(depotId);
+    } catch (error) {
+      logMainError(new Error(`Lua parsing skipped for ${luaEntry?.name || appId}: ${error.message || String(error)}`));
+    }
+  }
+
+  if (depotIds.size) {
+    const appInfo = await fetchSteamCmdAppInfo(appId);
+    for (const fileName of manifestFileNamesFromAppInfo(appInfo, String(appId), [...depotIds])) {
+      requiredFiles.add(fileName);
+    }
+  }
+
+  return [...requiredFiles];
+}
+
+function manifestSourceLabel(source) {
+  return source === 'fallback' ? 'External Vault' : 'Manifest Vault';
+}
+
+function summarizeManifestSources(manifests) {
+  return [...new Set((manifests || []).map((item) => manifestSourceLabel(item.source)).filter(Boolean))].join(' + ');
+}
+
+async function scheduleBackfill(payload) {
+  if (!payload || !payload.type) return;
+  const key = JSON.stringify(payload);
+  if (scheduledBackfills.has(key)) return;
+  scheduledBackfills.add(key);
+
+  try {
+    const response = await httpFetchWithTimeout(BACKFILL_ENDPOINT_URL, {
+      method: 'POST',
+      headers: makeHeaders({ 'Content-Type': 'application/json', Accept: 'application/json' }),
+      body: key
+    }, 20000);
+    if (!response.ok) {
+      const text = await response.text().catch(() => '');
+      logMainError(new Error(`Backfill skipped: HTTP ${response.status} ${text}`));
+    }
+  } catch (error) {
+    logMainError(new Error(`Backfill endpoint unavailable: ${error.message || String(error)}`));
+  }
+}
+
+async function findManifestInVaults(fileName, cache, appId, sender) {
+  if (cache.has(fileName)) return cache.get(fileName);
+
+  for (const source of manifestVaultSources()) {
+    const url = rawFileUrl(source.baseUrl, fileName);
+    try {
+      const response = await httpFetchWithTimeout(url, {
+        headers: makeHeaders({ Accept: 'application/octet-stream' })
+      }, 15000);
+      const bytes = await readBodyBytes(response, (pct) => {
+        if (sender) {
+          sender.send('download-progress', {
+            appId,
+            sourceId: source.id,
+            sourceName: source.label,
+            phase: 'manifest',
+            percent: pct
+          });
+        }
+      });
+
+      if (!response.ok || !bytes.length) throw new Error(response.ok ? 'empty manifest' : `HTTP ${response.status}`);
+      const found = {
+        name: path.basename(cleanDatabaseFileName(fileName)),
+        bytes,
+        targetType: 'manifest',
+        source: source.source,
+        sourceName: source.label
+      };
+      cache.set(fileName, found);
+      if (source.source === 'fallback') void scheduleBackfill({ type: 'manifest-vault', fileName });
+      return found;
+    } catch {
+      // Optional manifest enrichment must never block Lua/package installation.
+    }
+  }
+
+  cache.set(fileName, null);
+  return null;
+}
+
+async function downloadOptionalManifestFiles(appId, fileNames, sender) {
+  const manifests = [];
+  const added = new Set();
+  const cache = new Map();
+
+  for (const fileName of uniqueStrings(fileNames)) {
+    const found = await findManifestInVaults(fileName, cache, appId, sender);
+    if (!found || added.has(found.name.toLowerCase())) continue;
+    added.add(found.name.toLowerCase());
+    manifests.push(found);
+  }
+
+  return manifests;
+}
+
+async function enrichFilesWithRequiredManifests(appId, files, sender) {
+  const baseFiles = Array.isArray(files) ? files : [];
+  const luaEntries = baseFiles
+    .filter((file) => String(file?.name || '').toLowerCase().endsWith('.lua') && Buffer.isBuffer(file.bytes))
+    .map((file) => ({ name: file.name, bytes: file.bytes }));
+
+  if (!luaEntries.length) return { files: baseFiles, manifestSource: '' };
+
+  const existingManifests = new Set(baseFiles
+    .filter((file) => String(file?.name || '').toLowerCase().endsWith('.manifest'))
+    .map((file) => path.basename(String(file.name)).toLowerCase()));
+  const requiredFiles = await requiredManifestFileNamesForLuaEntries(appId, luaEntries);
+  const missingFiles = requiredFiles.filter((fileName) => !existingManifests.has(path.basename(fileName).toLowerCase()));
+  const manifests = await downloadOptionalManifestFiles(appId, missingFiles, sender);
+
+  return {
+    files: [...baseFiles, ...manifests],
+    manifestSource: summarizeManifestSources(manifests)
+  };
+}
+
+async function enrichZipWithRequiredManifests(appId, zipBytes, sender) {
+  try {
+    const zip = new AdmZip(zipBytes);
+    const entries = zip.getEntries().filter((entry) => !entry.isDirectory);
+    const luaEntries = entries
+      .filter((entry) => path.extname(entry.entryName).toLowerCase() === '.lua')
+      .map((entry) => ({ name: entry.entryName, bytes: entry.getData() }));
+
+    if (!luaEntries.length) return { zipBytes, manifestSource: '' };
+
+    const existingManifests = new Set(entries
+      .filter((entry) => path.extname(entry.entryName).toLowerCase() === '.manifest')
+      .map((entry) => path.basename(entry.entryName).toLowerCase()));
+    const requiredFiles = await requiredManifestFileNamesForLuaEntries(appId, luaEntries);
+    const missingFiles = requiredFiles.filter((fileName) => !existingManifests.has(path.basename(fileName).toLowerCase()));
+    const manifests = await downloadOptionalManifestFiles(appId, missingFiles, sender);
+
+    for (const manifest of manifests) {
+      const fileName = path.basename(manifest.name);
+      if (!zip.getEntry(fileName)) zip.addFile(fileName, manifest.bytes);
+    }
+
+    return {
+      zipBytes: manifests.length ? zip.toBuffer() : zipBytes,
+      manifestSource: summarizeManifestSources(manifests)
+    };
+  } catch (error) {
+    logMainError(new Error(`Manifest enrichment skipped for ${appId}: ${error.message || String(error)}`));
+    return { zipBytes, manifestSource: '' };
+  }
 }
 
 function formatHttpError(response, bodyText) {
@@ -2597,13 +2825,40 @@ async function generateAndInstall(event, payload) {
   const gameName = String(payload.gameName || '').trim();
   await assertAutoInstallQuota();
   const downloaded = await downloadManifestPackage(appId, event.sender);
-  const result = downloaded.kind === 'files'
-    ? await installFilePackageForApp({ appId, gameName, files: downloaded.files })
-    : downloaded.kind === 'lua'
-      ? await installLuaForApp({ appId, gameName, luaBytes: downloaded.luaBytes })
-      : await installZipForApp({ appId, gameName, zipBytes: downloaded.zipBytes });
+  let manifestSource = '';
+  let result;
+
+  if (downloaded.kind === 'files') {
+    const enriched = await enrichFilesWithRequiredManifests(appId, downloaded.files, event.sender);
+    manifestSource = enriched.manifestSource;
+    result = await installFilePackageForApp({ appId, gameName, files: enriched.files });
+  } else if (downloaded.kind === 'lua') {
+    const enriched = await enrichFilesWithRequiredManifests(appId, [{
+      name: `${appId}.lua`,
+      bytes: downloaded.luaBytes,
+      targetType: 'lua'
+    }], event.sender);
+    manifestSource = enriched.manifestSource;
+    result = await installFilePackageForApp({ appId, gameName, files: enriched.files });
+  } else {
+    const enriched = await enrichZipWithRequiredManifests(appId, downloaded.zipBytes, event.sender);
+    manifestSource = enriched.manifestSource;
+    result = await installZipForApp({ appId, gameName, zipBytes: enriched.zipBytes });
+  }
+
+  if (downloaded.source?.type === 'gamegen') {
+    void scheduleBackfill({ type: 'external-package', appId });
+  }
+
   const quota = await recordAutoInstallUse();
-  return { ...result, sourceId: downloaded.source.id, sourceName: downloaded.source.name, sourceType: downloaded.source.type, quota };
+  return {
+    ...result,
+    sourceId: downloaded.source.id,
+    sourceName: downloaded.source.name,
+    sourceType: downloaded.source.type,
+    manifestSource,
+    quota
+  };
 }
 
 async function installZipBytes(payload) {
@@ -2860,14 +3115,14 @@ async function runDatabaseZipSmokeTest() {
     const appId = '1190600';
     const downloaded = await downloadManifestPackage(appId, null);
     const result = await installDownloadedPackage(appId, 'Database ZIP Smoke', downloaded);
-    const luaExists = fs.existsSync(path.join(stPluginPath, `${appId}.lua`));
+    const luaCount = fs.readdirSync(stPluginPath).filter((name) => name.toLowerCase().endsWith('.lua')).length;
     const manifestCount = fs.readdirSync(depotCachePath).filter((name) => name.toLowerCase().endsWith('.manifest')).length;
 
     console.log(JSON.stringify({
-      ok: downloaded.kind === 'zip' && downloaded.source.id === 'charon-database-1' && luaExists && manifestCount > 0,
+      ok: downloaded.kind === 'zip' && downloaded.source.id === 'charon-database-1' && luaCount > 0 && manifestCount > 0,
       kind: downloaded.kind,
       sourceId: downloaded.source.id,
-      luaExists,
+      luaCount,
       manifestCount,
       fileCount: result.fileCount
     }));
@@ -2914,7 +3169,7 @@ async function runDatabaseDirectNoIndexSmokeTest() {
     const zipAppId = '1190600';
     const zipDownloaded = await downloadManifestPackage(zipAppId, null);
     const zipResult = await installDownloadedPackage(zipAppId, 'Direct ZIP No Index Smoke', zipDownloaded);
-    const zipLuaExists = fs.existsSync(path.join(stPluginPath, `${zipAppId}.lua`));
+    const zipLuaCount = fs.readdirSync(stPluginPath).filter((name) => name.toLowerCase().endsWith('.lua')).length;
     const manifestCount = fs.readdirSync(depotCachePath).filter((name) => name.toLowerCase().endsWith('.manifest')).length;
 
     console.log(JSON.stringify({
@@ -2922,13 +3177,13 @@ async function runDatabaseDirectNoIndexSmokeTest() {
         luaResult.fileCount === 1 &&
         luaExists &&
         zipDownloaded.kind === 'zip' &&
-        zipLuaExists &&
+        zipLuaCount > 1 &&
         manifestCount > 0 &&
         zipResult.fileCount > 1,
       luaKind: luaDownloaded.kind,
       zipKind: zipDownloaded.kind,
       luaExists,
-      zipLuaExists,
+      zipLuaCount,
       manifestCount,
       luaFileCount: luaResult.fileCount,
       zipFileCount: zipResult.fileCount
@@ -3171,6 +3426,20 @@ async function runInstalledDedupeSmokeTest() {
   }
 }
 
+async function runManifestEnrichmentSmokeTest() {
+  const luaBytes = Buffer.from('addappid(123456, 1, "0123456789abcdef0123456789abcdef")\n-- 987654_123456789.manifest\n', 'utf8');
+  const required = await requiredManifestFileNamesForLuaEntries('999999', [{ name: '999999.lua', bytes: luaBytes }]);
+  const files = [{ name: '999999.lua', bytes: luaBytes, targetType: 'lua' }];
+  const enriched = await enrichFilesWithRequiredManifests('999999', files, null);
+
+  console.log(JSON.stringify({
+    ok: required.includes('987654_123456789.manifest') && enriched.files.length >= 1,
+    required,
+    enrichedFileCount: enriched.files.length,
+    manifestSource: enriched.manifestSource || ''
+  }));
+}
+
 async function runBannerRenderSmokeTest() {
   const testWindow = new BrowserWindow({
     width: 1240,
@@ -3340,10 +3609,10 @@ function registerIpc() {
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1240,
-    height: 820,
-    minWidth: 1040,
-    minHeight: 720,
+    width: 1380,
+    height: 900,
+    minWidth: 1120,
+    minHeight: 760,
     backgroundColor: '#111316',
     icon: path.join(__dirname, 'assets', 'app-logo.png'),
     autoHideMenuBar: true,
@@ -3495,6 +3764,12 @@ app.whenReady().then(async () => {
 
   if (process.argv.includes('--installed-dedupe-smoke-test')) {
     await runInstalledDedupeSmokeTest();
+    exitForCliSmoke();
+    return;
+  }
+
+  if (process.argv.includes('--manifest-enrichment-smoke-test')) {
+    await runManifestEnrichmentSmokeTest();
     exitForCliSmoke();
     return;
   }

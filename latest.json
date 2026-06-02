@@ -1,8 +1,8 @@
 {
-  "version": "1.0.14",
-  "downloadUrl": "https://github.com/BlissBlender/Charon/releases/download/v1.0.14/Charon-1.0.14.exe",
-  "releaseUrl": "https://github.com/BlissBlender/Charon/releases/tag/v1.0.14",
-  "sha256": "6215488cfdbcfbb7e54e70c4baccd1861eff716fe7b179bad6da8af0c5a964d4",
-  "notes": "Adds the Website shortcut to the Charon sidebar and keeps the portable release output tidy.",
-  "publishedAt": "2026-06-01T04:21:22Z"
+    "version":  "1.0.15",
+    "downloadUrl":  "https://github.com/BlissBlender/Charon/releases/download/v1.0.15/Charon-1.0.15.exe",
+    "releaseUrl":  "https://github.com/BlissBlender/Charon/releases/tag/v1.0.15",
+    "notes":  "Adds automatic Lua manifest enrichment from ManifestVault, external vault backfill via the Charon bot, cleaner important-only activity logs, and a roomier desktop layout.",
+    "sha256":  "91c1935458d4d5d0be915869299ae9c0731f57b39a8a0a4e0fd6cfcdca3fc475",
+    "publishedAt":  "2026-06-02T16:07:11Z"
 }
