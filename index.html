@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' https: data:; style-src 'self'; script-src 'self';">
+  <title>Charon</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <img class="brand-logo" src="assets/brand-mark.png" alt="">
+        <div>
+          <h1>Charon</h1>
+          <p id="version-label">Portable</p>
+        </div>
+      </div>
+
+      <nav class="nav">
+        <button class="nav-btn active" data-tab="search">Search</button>
+        <button class="nav-btn" data-tab="installed">Installed</button>
+        <button class="nav-btn" data-tab="manifests">Manifests</button>
+        <button class="nav-btn" data-tab="settings">Settings</button>
+      </nav>
+
+      <section class="community-actions">
+        <button id="join-discord-btn" class="discord-join">Join Discord</button>
+        <button id="open-website-btn" class="website-link">Website</button>
+      </section>
+
+      <section class="steam-actions">
+        <button id="open-steam-sidebar-btn" class="secondary">Open Steam</button>
+        <button id="restart-steam-sidebar-btn" class="secondary">Restart Steam</button>
+      </section>
+
+      <section class="status-panel">
+        <div>
+          <span class="label">Steam</span>
+          <strong id="steam-summary">Detecting</strong>
+        </div>
+      </section>
+    </aside>
+
+    <main class="content">
+      <section class="tab active" id="tab-search">
+        <div class="toolbar">
+          <div>
+            <h2>Steam Search</h2>
+            <p>Find a title, inspect its App ID, and install manifests automatically.</p>
+          </div>
+          <div class="toolbar-actions">
+            <button id="refresh-search-btn" class="secondary" title="Refresh search results">↻ Refresh Results</button>
+            <button id="clear-search-btn" class="secondary">Clear</button>
+          </div>
+        </div>
+
+        <div class="split">
+          <section class="panel">
+            <form id="search-form" class="input-row">
+              <input id="search-input" type="search" placeholder="Search Steam Store">
+              <button type="submit">Search</button>
+            </form>
+            <form id="direct-form" class="input-row">
+              <input id="direct-appid" inputmode="numeric" placeholder="Steam App ID">
+              <button type="submit" class="secondary">Load</button>
+            </form>
+            <p id="search-refresh-status" class="status-line"></p>
+            <div id="search-results" class="result-list"></div>
+          </section>
+
+          <section class="panel detail-panel">
+            <button id="refresh-detail-btn" class="icon-refresh-btn" title="Refresh selected game details" aria-label="Refresh selected game details" disabled>↻</button>
+            <img id="detail-image" class="hero-img" alt="">
+            <div class="detail-body">
+              <span id="detail-appid" class="pill">No App ID selected</span>
+              <h3 id="detail-title">Select a game</h3>
+              <p id="detail-description">Search Steam or load an App ID directly.</p>
+              <div id="detail-meta" class="meta-list"></div>
+            </div>
+            <div class="action-row">
+              <button id="install-selected-btn" disabled>Install Manifests</button>
+              <button id="open-store-btn" class="secondary" disabled>Store</button>
+            </div>
+            <p id="auto-quota-label" class="quota-line">Automatic installs: checking...</p>
+            <div id="install-progress" class="progress hidden">
+              <div id="progress-bar"></div>
+            </div>
+            <p id="install-status" class="status-line"></p>
+          </section>
+        </div>
+
+        <section class="panel manual-import-panel">
+          <div class="manual-copy">
+            <span class="pill">Manual Import</span>
+            <h3>Install a manifest ZIP</h3>
+            <p>Drop a local manifest package and deploy it with the same installer Charon uses for automatic installs.</p>
+          </div>
+
+          <div class="manual-import-grid">
+            <div class="manual-fields">
+              <label>Steam App ID</label>
+              <input id="manual-appid" inputmode="numeric" placeholder="Example: 1091500">
+              <p id="manual-file-label" class="manual-file-label">No ZIP selected</p>
+            </div>
+
+            <div id="manual-drop-zone" class="drop-zone" role="button" tabindex="0">
+              <input id="manual-file-input" class="visually-hidden" type="file" accept=".zip,application/zip">
+              <div class="drop-zone-core">
+                <strong>Drop manifest ZIP here</strong>
+                <span>or click to choose a `.zip` containing `.lua` / `.manifest` files</span>
+              </div>
+            </div>
+
+            <div class="manual-actions">
+              <button id="manual-install-btn" disabled>Install ZIP</button>
+              <p id="manual-status" class="status-line"></p>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel activity-panel">
+          <div class="activity-header">
+            <div>
+              <span class="pill">Activity</span>
+              <h3>Activity Log</h3>
+              <p>Recent searches, installs, Steam actions, and setup changes.</p>
+            </div>
+            <button id="clear-activity-btn" class="secondary">Clear</button>
+          </div>
+          <div id="activity-list" class="activity-list"></div>
+        </section>
+      </section>
+
+      <section class="tab" id="tab-installed">
+        <div class="toolbar">
+          <div>
+            <h2>Installed Steam Games</h2>
+            <p>Read local appmanifest files from every detected Steam library.</p>
+          </div>
+          <button id="refresh-installed-btn" class="secondary">↻ Refresh Installed</button>
+        </div>
+        <p id="installed-status" class="status-line"></p>
+        <div id="installed-list" class="table-list"></div>
+      </section>
+
+      <section class="tab" id="tab-manifests">
+        <div class="toolbar">
+          <div>
+            <h2>Tracked Manifests</h2>
+            <p>Files installed by Charon can be removed from here.</p>
+          </div>
+          <div class="toolbar-actions">
+            <button id="refresh-manifest-btn" class="secondary">↻ Refresh Manifest</button>
+            <button id="restart-steam-btn" class="secondary">Restart Steam</button>
+          </div>
+        </div>
+        <p id="manifest-status" class="status-line"></p>
+        <div id="manifest-list" class="table-list"></div>
+      </section>
+
+      <section class="tab" id="tab-settings">
+        <div class="toolbar">
+          <div>
+            <h2>Settings</h2>
+            <p>Portable settings are stored in Windows local app data so updates and moved EXE files keep working.</p>
+          </div>
+          <button id="save-settings-btn">Save</button>
+        </div>
+
+        <div class="settings-grid">
+          <section class="panel">
+            <h3>Steam Paths</h3>
+            <label>Steam root</label>
+            <div class="inline-field">
+              <input id="steam-root" placeholder="Folder containing steam.exe">
+              <button id="pick-steam-root" class="small secondary">Browse</button>
+            </div>
+            <label>stplug-in folder</label>
+            <div class="inline-field">
+              <input id="st-plugin-path" placeholder="Steam\\config\\stplug-in">
+              <button id="pick-plugin-path" class="small secondary">Browse</button>
+            </div>
+            <label>depotcache folder</label>
+            <div class="inline-field">
+              <input id="depot-cache-path" placeholder="Steam\\config\\depotcache">
+              <button id="pick-depot-path" class="small secondary">Browse</button>
+            </div>
+            <div class="action-row">
+              <button id="detect-steam-btn" class="secondary">Auto Detect</button>
+              <button id="restart-steam-settings-btn" class="secondary">Restart Steam</button>
+            </div>
+            <p id="settings-status" class="status-line"></p>
+          </section>
+
+          <section class="panel">
+            <h3>Updates</h3>
+            <p class="panel-copy">Check the public Charon release feed for a newer portable build.</p>
+            <p class="version-chip">Current version <strong id="settings-version-label">v...</strong></p>
+            <div class="action-row">
+              <button id="check-updates-btn" class="secondary">Check for Updates</button>
+              <button id="download-update-btn" class="hidden">Update Now</button>
+            </div>
+            <p id="update-status" class="status-line"></p>
+          </section>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="update-gate" class="update-gate hidden" role="dialog" aria-modal="true" aria-labelledby="update-gate-title">
+    <section class="update-gate-card">
+      <span class="pill">Required Update</span>
+      <h2 id="update-gate-title">New Charon Update Available</h2>
+      <p id="update-gate-copy">A newer production build is available. Update now to continue using Charon.</p>
+      <div class="setup-preview">
+        <span>Latest version</span>
+        <strong id="update-gate-version">Checking...</strong>
+      </div>
+      <div class="setup-actions">
+        <button id="update-gate-button">Update Charon</button>
+      </div>
+      <p id="update-gate-status" class="status-line"></p>
+    </section>
+  </div>
+
+  <div id="setup-overlay" class="setup-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="setup-title">
+    <section class="setup-card">
+      <span class="pill">First Run</span>
+      <h2 id="setup-title">Connect Steam paths</h2>
+      <p>Set the Steam folder Charon should use for manifest files. You can change this later in Settings.</p>
+
+      <div class="setup-preview">
+        <span>Steam folder</span>
+        <strong id="setup-steam-preview">Not configured</strong>
+      </div>
+
+      <div class="setup-actions">
+        <button id="setup-detect-btn">Auto Detect</button>
+        <button id="setup-browse-btn" class="secondary">Choose Folder</button>
+        <button id="setup-settings-btn" class="secondary">Open Settings</button>
+        <button id="setup-skip-btn" class="secondary">Skip</button>
+      </div>
+      <p id="setup-status" class="status-line"></p>
+    </section>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

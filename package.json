@@ -1,0 +1,50 @@
+{
+  "name": "charon",
+  "version": "1.0.14",
+  "description": "Charon Manifest Tool",
+  "main": "main.js",
+  "author": "Charon",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win portable -p never",
+    "check": "node --check main.js && node --check preload.js && node --check renderer.js"
+  },
+  "dependencies": {
+    "adm-zip": "^0.5.16"
+  },
+  "devDependencies": {
+    "electron": "^30.5.1",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "app.charon.portable",
+    "productName": "Charon",
+    "artifactName": "Charon-${version}.${ext}",
+    "asar": true,
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer.js",
+      "index.html",
+      "styles.css",
+      "assets/**",
+      "package.json"
+    ],
+    "win": {
+      "icon": "assets/app-logo.ico",
+      "signAndEditExecutable": false,
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    }
+  }
+}

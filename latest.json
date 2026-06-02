@@ -1,8 +1,8 @@
 {
-  "version": "1.0.13",
-  "downloadUrl": "https://github.com/BlissBlender/Charon/releases/download/v1.0.13/Charon-1.0.13.exe",
-  "releaseUrl": "https://github.com/BlissBlender/Charon/releases/tag/v1.0.13",
-  "sha256": "14d3ce4eec6d64f7e76262da8f64c91d8e1a02bbab2926e6bdda141f653357f4",
-  "notes": "Steam banner resolver update: validated artwork now powers Search, Installed, Tracked Manifests, and Game Details with refresh controls.",
-  "publishedAt": "2026-05-26T18:28:10Z"
+  "version": "1.0.14",
+  "downloadUrl": "https://github.com/BlissBlender/Charon/releases/download/v1.0.14/Charon-1.0.14.exe",
+  "releaseUrl": "https://github.com/BlissBlender/Charon/releases/tag/v1.0.14",
+  "sha256": "6215488cfdbcfbb7e54e70c4baccd1861eff716fe7b179bad6da8af0c5a964d4",
+  "notes": "Adds the Website shortcut to the Charon sidebar and keeps the portable release output tidy.",
+  "publishedAt": "2026-06-01T04:21:22Z"
 }
