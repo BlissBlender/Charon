@@ -1,8 +1,8 @@
 {
-    "version":  "1.0.16",
-    "downloadUrl":  "https://github.com/BlissBlender/Charon/releases/download/v1.0.16/Charon-1.0.16.exe",
-    "releaseUrl":  "https://github.com/BlissBlender/Charon/releases/tag/v1.0.16",
-    "notes":  "Backfills manifest files already bundled inside external API ZIP packages into ManifestVault through the Charon bot Worker.",
-    "sha256":  "2f5879fea2909e0822d9a738502af8c988d4cca0f72e552d45877e47b66837b0",
-    "publishedAt":  "2026-06-02T17:21:46Z"
+    "version":  "1.0.17",
+    "downloadUrl":  "https://github.com/BlissBlender/Charon/releases/download/v1.0.17/Charon-1.0.17.exe",
+    "releaseUrl":  "https://github.com/BlissBlender/Charon/releases/tag/v1.0.17",
+    "notes":  "Adds bot health checks before app backfill requests so external source backfills fail clearly and retry through the Charon bot service.",
+    "sha256":  "d0657b8f87099a1e7bb9b6189c268f7c060b0e48dcf571bd29c7bfb47f4368e1",
+    "publishedAt":  "2026-06-03T05:12:21Z"
 }

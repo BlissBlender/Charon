@@ -20,6 +20,7 @@ const STEAMCMD_INFO_URL = 'https://api.steamcmd.net/v1/info/';
 const MANIFEST_VAULT_BASE_URL = 'https://raw.githubusercontent.com/BlissBlender/ManifestVault/main';
 const EXTERNAL_MANIFEST_VAULT_BASE_URL = 'https://raw.githubusercontent.com/qwe213312/k25FCdfEOoEJ42S6/main';
 const BACKFILL_ENDPOINT_URL = 'https://charon-bot.vyro.workers.dev/api/backfill';
+const BACKFILL_HEALTH_ENDPOINT_URL = 'https://charon-bot.vyro.workers.dev/health';
 const EXCLUDED_APP_IDS = new Set(['228980', '107056', '1110390']);
 const AUTO_INSTALL_DAILY_LIMIT = 10;
 const AUTO_INSTALL_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -1110,6 +1111,16 @@ async function scheduleBackfill(payload) {
   scheduledBackfills.add(key);
 
   try {
+    const health = await httpFetchWithTimeout(BACKFILL_HEALTH_ENDPOINT_URL, {
+      method: 'GET',
+      headers: makeHeaders({ Accept: 'application/json' })
+    }, 10000);
+    if (!health.ok) {
+      const text = await health.text().catch(() => '');
+      logMainError(new Error(`Backfill health check failed: HTTP ${health.status} ${text}`));
+      return;
+    }
+
     const response = await httpFetchWithTimeout(BACKFILL_ENDPOINT_URL, {
       method: 'POST',
       headers: makeHeaders({ 'Content-Type': 'application/json', Accept: 'application/json' }),
