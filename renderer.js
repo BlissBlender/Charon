@@ -9,8 +9,8 @@ const state = {
   searchResults: [],
   searchCache: new Map(),
   searchRequestId: 0,
-  searchDebounceTimer: null,
-  thumbnailCache: new Map(),
+  searchDebounceTimer: null,  pendingAutoRetries: new Map(),  autoRetryTimer: null,
+  thumbnailCache: new Map(),  suggestionCache: new Map(),  suggestionTimer: null,
   thumbnailInFlight: new Map()
 };
 
@@ -150,6 +150,8 @@ async function loadImageWithRetry(src) {
     try {
       return await loadImageOnce(src);
     } catch (error) {
+
+      startAutoRetry(appId, state.selectedGame?.name || "");
       lastError = error;
       if (attempt < THUMBNAIL_RETRIES) await delay(THUMBNAIL_RETRY_DELAY_MS);
     }
@@ -1366,6 +1368,15 @@ function bindEvents() {
   });
 }
 
+
+  // Listen for download progress from main process
+  if (window.charon.onProgress) {
+    window.charon.onProgress(function(data) {
+      if (data && data.message) {
+        setStatus(els.installProgress, data.message, 'info');
+      }
+    });
+  }
 function bindGlobalErrorHandlers() {
   window.addEventListener('error', (event) => {
     const message = event.error?.message || event.message || 'Unexpected UI error.';

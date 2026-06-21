@@ -46,8 +46,13 @@ contextBridge.exposeInMainWorld('charon', {
   },
   onDownloadProgress: (callback) => {
     const listener = (_event, payload) => callback(payload);
-    ipcRenderer.on('download-progress', listener);
+    ipcRenderer.on('download-progress-proxy', listener);
     return () => ipcRenderer.removeListener('download-progress', listener);
+  },
+  onProgress: (callback) => {
+    const listener = (_event, payload) => callback(payload);
+    ipcRenderer.on("download-progress", listener);
+    return () => ipcRenderer.removeListener("download-progress", listener);
   },
   onUpdateProgress: (callback) => {
     const listener = (_event, payload) => callback(payload);

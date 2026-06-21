@@ -21,6 +21,7 @@ const MANIFEST_VAULT_BASE_URL = 'https://raw.githubusercontent.com/BlissBlender/
 const EXTERNAL_MANIFEST_VAULT_BASE_URL = 'https://raw.githubusercontent.com/qwe213312/k25FCdfEOoEJ42S6/main';
 const BACKFILL_ENDPOINT_URL = 'https://charon-bot.vyro.workers.dev/api/backfill';
 const BACKFILL_HEALTH_ENDPOINT_URL = 'https://charon-bot.vyro.workers.dev/health';
+const GEN_LOG_ENDPOINT = 'https://charon-bot.vyro.workers.dev/api/gen-log';
 const EXCLUDED_APP_IDS = new Set(['228980', '107056', '1110390']);
 const AUTO_INSTALL_DAILY_LIMIT = 10;
 const AUTO_INSTALL_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -1000,6 +1001,9 @@ async function downloadDatabaseFile(source, fileName, appId, sender, phase, acce
         sourceId: source.id,
         sourceName: source.name,
         phase,
+      message: "Searching " + source.name + "...",
+      sourceIndex: i,
+      sourceCount: sources.length,
         percent: pct
       });
     }
@@ -1135,6 +1139,29 @@ async function scheduleBackfill(payload) {
   }
 }
 
+
+
+async function sendAppGenLog(result, startedAt) {
+  try {
+    if (!result || !result.appId) return;
+    const payload = {
+      appId: result.appId,
+      game: result.game || null,
+      source: result.sourceId || result.source || "",
+      manifestCount: result.manifestCount || 0,
+      manifestSource: result.manifestSource || "",
+      elapsedMs: startedAt ? Date.now() - startedAt : 0,
+      backfillStatus: result.backfillStatus || ""
+    };
+    await httpFetchWithTimeout(GEN_LOG_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }, 10000);
+  } catch (err) {
+    console.log("sendAppGenLog failed:", err.message);
+  }
+}
 async function findManifestInVaults(fileName, cache, appId, sender) {
   if (cache.has(fileName)) return cache.get(fileName);
 
@@ -3624,7 +3651,17 @@ function registerIpc() {
   ipcMain.handle('api:activate', async () => activateApi());
   ipcMain.handle('api:stats', async () => statsApi());
   ipcMain.handle('api:requestGame', async (_event, payload) => requestGameApi(payload || {}));
-  ipcMain.handle('api:generateInstall', async (event, payload) => generateAndInstall(event, payload || {}));
+  ipcMain.handle('api:generateInstall', async (event, payload) => {
+  const startedAt = Date.now();
+  try {
+    const result = await generateAndInstall(event, payload || {});
+    sendAppGenLog(result, startedAt).catch(() => {});
+    return result;
+  } catch (err) {
+    sendAppGenLog({ appId: payload?.appId, source: "error", backfillStatus: "failed: " + (err.message || err) }, startedAt).catch(() => {});
+    throw err;
+  }
+});
   ipcMain.handle('api:installZipBytes', async (_event, payload) => installZipBytes(payload || {}));
   ipcMain.handle('limits:autoInstallQuota', async () => getAutoInstallQuota());
   ipcMain.handle('updates:check', async () => checkForUpdates());
