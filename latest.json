@@ -1,8 +1,6 @@
 {
-    "version":  "1.0.17",
-    "downloadUrl":  "https://github.com/BlissBlender/Charon/releases/download/v1.0.17/Charon-1.0.17.exe",
-    "releaseUrl":  "https://github.com/BlissBlender/Charon/releases/tag/v1.0.17",
-    "notes":  "Adds bot health checks before app backfill requests so external source backfills fail clearly and retry through the Charon bot service.",
-    "sha256":  "d0657b8f87099a1e7bb9b6189c268f7c060b0e48dcf571bd29c7bfb47f4368e1",
-    "publishedAt":  "2026-06-03T05:12:21Z"
+  "version": "1.0.18",
+  "sha256": "975c8e8cef5c299c4ec3e9608ffcdfe83cc4d4fe3d6febaaa338b8cd150e7324",
+  "releaseNotes": "Adds genlog reporting to Discord genlog channel after each installation (success or failure), matching the website and bot genlog system.",
+  "publishedAt": "2026-06-21T12:51:39.296Z"
 }
