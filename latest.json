@@ -1,6 +1,6 @@
 {
   "version": "1.0.18",
-  "sha256": "975c8e8cef5c299c4ec3e9608ffcdfe83cc4d4fe3d6febaaa338b8cd150e7324",
-  "releaseNotes": "Adds genlog reporting to Discord genlog channel after each installation (success or failure), matching the website and bot genlog system.",
-  "publishedAt": "2026-06-21T12:51:39.296Z"
+  "sha256": "ac08d3af8d0b4c1a1d9edea2aa536840dcde1143a01cf3d4a0cf0753f97da452",
+  "releaseNotes": "Fixes progress bar colors (green for success, red for error) and source labels (proper English names like Database 1, Database 2, GameGen).",
+  "publishedAt": "2026-06-21T13:18:46.077Z"
 }

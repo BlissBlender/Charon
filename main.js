@@ -689,6 +689,18 @@ function normalizeSourceConfig(config) {
   return normalized;
 }
 
+function sourceLabel(source) {
+  if (!source) return "Unknown";
+  const labels = {
+    "charon-database-1": "Database 1",
+    "charon-database-2": "Database 2",
+    "gamegen-primary": "GameGen",
+    "manifest-vault": "Manifest Vault",
+    "external-vault": "External Vault"
+  };
+  return labels[source.id] || labels[source.sourceId] || source.name || source.id || "Unknown Source";
+}
+
 function sourceHasAccess(source) {
   if (!source || source.enabled === false) return false;
   if (source.type === 'database-url') return Boolean(String(source.baseUrl || source.indexUrl || '').trim());
@@ -1001,7 +1013,7 @@ async function downloadDatabaseFile(source, fileName, appId, sender, phase, acce
         sourceId: source.id,
         sourceName: source.name,
         phase,
-      message: "Searching " + source.name + "...",
+      message: "Searching " + sourceLabel(source) + "...",
       sourceIndex: i,
       sourceCount: sources.length,
         percent: pct

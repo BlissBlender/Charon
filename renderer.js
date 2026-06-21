@@ -95,10 +95,15 @@ const els = {
   setupStatus: $('#setup-status')
 };
 
-function setStatus(el, message, kind = '') {
-  el.textContent = message || '';
-  el.classList.remove('ok', 'error');
+function setStatus(el, message, kind = "") {
+  el.textContent = message || "";
+  el.classList.remove("ok", "error");
   if (kind) el.classList.add(kind);
+  // Also update progress bar color
+  if (el === els.installStatus) {
+    els.progressBar.classList.remove("ok", "error");
+    if (kind) els.progressBar.classList.add(kind);
+  }
 }
 
 function setBusy(button, busy, label) {
