@@ -2748,6 +2748,8 @@ async function installZipForApp({ appId, gameName, zipBytes }) {
 
   await fsp.mkdir(folders.stPluginPath, { recursive: true });
   await fsp.mkdir(folders.depotCachePath, { recursive: true });
+  const configDepotCachePath = folders.steamRoot ? path.join(folders.steamRoot, 'config', 'depotcache') : null;
+  if (configDepotCachePath) await fsp.mkdir(configDepotCachePath, { recursive: true });
 
   const zip = new AdmZip(zipBytes);
   const deployed = [];
