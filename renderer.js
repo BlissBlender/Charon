@@ -47,6 +47,7 @@ const els = {
   installProgress: $('#install-progress'),
   progressBar: $('#progress-bar'),
   installStatus: $('#install-status'),
+    installManifestCount: $('#install-manifest-count'),
   manualAppId: $('#manual-appid'),
   manualDropZone: $('#manual-drop-zone'),
   manualFileInput: $('#manual-file-input'),
@@ -866,7 +867,7 @@ async function installSelected() {
     const manifestLabel = result.manifestSource
       ? ` Manifest source: ${result.manifestSource}.`
       : '';
-    setStatus(els.installStatus, `${sourceLabel}.${manifestLabel} Installed ${result.fileCount} file(s). Restart Steam to reload changes.`, 'ok');
+    setStatus(els.installStatus, `${sourceLabel}.${manifestLabel} Installed ${result.fileCount} file(s) (${result.manifestCount || result.fileCount || 0} manifest(s)). Restart Steam to reload changes.`, 'ok');
     void addActivity(`${sourceLabel}.${manifestLabel} Injected ${result.fileCount} file(s) for ${state.selectedGame.name} (${state.selectedGame.appId}). ${describeInstalledFiles(result)}`, 'ok');
     if (result.quota) {
       els.autoQuotaLabel.textContent = `Automatic installs: ${result.quota.remaining}/${result.quota.limit} left in 24h.`;
@@ -1344,20 +1345,24 @@ function bindEvents() {
   window.charon.onDownloadProgress((payload) => {
     els.installProgress.classList.remove('hidden');
     els.progressBar.style.width = `${Math.round(payload.percent || 0)}%`;
-    setStatus(
-      els.installStatus,
-      payload.phase === 'source'
-        ? 'Preparing manifest download...'
-        : payload.phase === 'lua'
-        ? `Checking Charon Repo... ${Math.round(payload.percent || 0)}%`
-        : payload.phase === 'manifest'
-        ? `Downloading manifests... ${Math.round(payload.percent || 0)}%`
-        : payload.phase === 'download'
-        ? `Downloading ZIP... ${Math.round(payload.percent || 0)}%`
-        : payload.phase === 'repository'
-          ? `Checking manifest package... ${Math.round(payload.percent || 0)}%`
-          : `Contacting manifest service... ${Math.round(payload.percent || 0)}%`
-    );
+    var pct = Math.round(payload.percent || 0);
+    if (payload.message) {
+      setStatus(els.installStatus, payload.message + ' ' + pct + '%');
+    } else {
+      var msg =
+        payload.phase === 'source'
+          ? 'Preparing manifest download...'
+          : payload.phase === 'lua'
+          ? 'Checking repository for Lua data...'
+          : payload.phase === 'manifest'
+          ? 'Resolving manifest dependencies...'
+          : payload.phase === 'download'
+          ? 'Downloading package...'
+          : payload.phase === 'repository'
+          ? 'Checking package map...'
+          : 'Contacting manifest service...';
+      setStatus(els.installStatus, msg + ' ' + pct + '%');
+    }
   });
 
   window.charon.onUpdateProgress((payload) => {

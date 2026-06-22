@@ -689,18 +689,6 @@ function normalizeSourceConfig(config) {
   return normalized;
 }
 
-function sourceLabel(source) {
-  if (!source) return "Unknown";
-  const labels = {
-    "charon-database-1": "Database 1",
-    "charon-database-2": "Database 2",
-    "gamegen-primary": "GameGen",
-    "manifest-vault": "Manifest Vault",
-    "external-vault": "External Vault"
-  };
-  return labels[source.id] || labels[source.sourceId] || source.name || source.id || "Unknown Source";
-}
-
 function sourceHasAccess(source) {
   if (!source || source.enabled === false) return false;
   if (source.type === 'database-url') return Boolean(String(source.baseUrl || source.indexUrl || '').trim());
@@ -1013,9 +1001,6 @@ async function downloadDatabaseFile(source, fileName, appId, sender, phase, acce
         sourceId: source.id,
         sourceName: source.name,
         phase,
-      message: "Searching " + sourceLabel(source) + "...",
-      sourceIndex: i,
-      sourceCount: sources.length,
         percent: pct
       });
     }
@@ -1151,29 +1136,6 @@ async function scheduleBackfill(payload) {
   }
 }
 
-
-
-async function sendAppGenLog(result, startedAt) {
-  try {
-    if (!result || !result.appId) return;
-    const payload = {
-      appId: result.appId,
-      game: result.game || null,
-      source: result.sourceId || result.source || "",
-      manifestCount: result.manifestCount || 0,
-      manifestSource: result.manifestSource || "",
-      elapsedMs: startedAt ? Date.now() - startedAt : 0,
-      backfillStatus: result.backfillStatus || ""
-    };
-    await httpFetchWithTimeout(GEN_LOG_ENDPOINT, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    }, 10000);
-  } catch (err) {
-    console.log("sendAppGenLog failed:", err.message);
-  }
-}
 async function findManifestInVaults(fileName, cache, appId, sender) {
   if (cache.has(fileName)) return cache.get(fileName);
 
@@ -1901,7 +1863,8 @@ function defaultSteamFolders(steamRoot) {
   if (!steamRoot) return { stPluginPath: '', depotCachePath: '' };
   return {
     stPluginPath: path.join(steamRoot, 'config', 'stplug-in'),
-    depotCachePath: path.join(steamRoot, 'depotcache')
+    depotCachePath: path.join(steamRoot, 'depotcache'),
+    configDepotCachePath: path.join(steamRoot, 'config', 'depotcache')
   };
 }
 
@@ -2595,11 +2558,20 @@ async function downloadDatabaseZip(source, zipName, appId, sender) {
   return zipBytes;
 }
 
+// ========== downloadFromDatabaseSource with website-matching status messages ==========
 async function downloadFromDatabaseSource(source, appId, sender) {
   const errors = [];
   let directLuaFiles = null;
   let index = null;
   let entry = null;
+  const dbLabel = source.name || source.id || 'Database';
+
+  if (sender) sender.send('download-progress', {
+    appId, heading: 'App Gen',
+    phase: 'database',
+    message: 'Checking ' + dbLabel + ' for a Lua package...',
+    percent: 5
+  });
 
   try {
     const luaBytes = await downloadDatabaseFile(source, `${appId}.lua`, appId, sender, 'lua', 'text/plain, application/octet-stream');
@@ -2610,6 +2582,13 @@ async function downloadFromDatabaseSource(source, appId, sender) {
       bytes: luaBytes,
       targetType: 'lua'
     }];
+
+    if (sender) sender.send('download-progress', {
+      appId, heading: 'App Gen',
+      phase: 'manifests',
+      message: 'Resolving ' + appId + ' manifest dependencies...',
+      percent: 20
+    });
 
     try {
       index = await loadDatabaseIndex(source);
@@ -2627,10 +2606,25 @@ async function downloadFromDatabaseSource(source, appId, sender) {
       errors.push(`optional index manifests: ${error.message || String(error)}`);
     }
 
-    if (directLuaFiles.length > 1) return { kind: 'files', files: directLuaFiles };
+    if (directLuaFiles.length > 1) {
+      if (sender) sender.send('download-progress', {
+        appId, heading: 'App Gen',
+        phase: 'complete',
+        message: 'Bundling ' + appId + '.lua with ' + (directLuaFiles.length - 1) + ' manifest(s)...',
+        percent: 80
+      });
+      return { kind: 'files', files: directLuaFiles };
+    }
   } catch (error) {
     errors.push(`${appId}.lua: ${error.message || String(error)}`);
   }
+
+  if (sender) sender.send('download-progress', {
+    appId, heading: 'App Gen',
+    phase: 'zip',
+    message: 'Checking ' + dbLabel + ' for a ZIP package...',
+    percent: 35
+  });
 
   try {
     return { kind: 'zip', bytes: await downloadDatabaseZip(source, `${appId}.zip`, appId, sender) };
@@ -2639,6 +2633,13 @@ async function downloadFromDatabaseSource(source, appId, sender) {
   }
 
   if (directLuaFiles) return { kind: 'files', files: directLuaFiles };
+
+  if (sender) sender.send('download-progress', {
+    appId, heading: 'App Gen',
+    phase: 'index',
+    message: 'Checking ' + dbLabel + ' package map...',
+    percent: 60
+  });
 
   try {
     if (!index) index = await loadDatabaseIndex(source);
@@ -2666,6 +2667,7 @@ async function downloadFromDatabaseSource(source, appId, sender) {
   throw new Error(errors.length ? errors.join(' | ') : 'database package was not found.');
 }
 
+// ========== downloadFromSource (unchanged dispatcher) ==========
 async function downloadFromSource(source, appId, sender) {
   if (source.type === 'database-url') return downloadFromDatabaseSource(source, appId, sender);
   if (source.type === 'lua-url') return { kind: 'lua', bytes: await downloadFromLuaUrlSource(source, appId, sender) };
@@ -2675,6 +2677,7 @@ async function downloadFromSource(source, appId, sender) {
   throw new Error('Manifest provider is unavailable.');
 }
 
+// ========== downloadManifestPackage with website-matching status messages ==========
 async function downloadManifestPackage(appId, sender) {
   const id = String(appId || '').trim();
   if (!/^\d+$/.test(id)) throw new Error('Steam App ID must be numeric.');
@@ -2690,17 +2693,41 @@ async function downloadManifestPackage(appId, sender) {
   for (const source of sources) {
     try {
       if (sender) sender.send('download-progress', {
-        appId: id,
-        sourceId: source.id,
-        sourceName: source.name,
+        appId: id, heading: 'App Gen',
+        sourceId: source.id, sourceName: source.name,
         phase: 'source',
+        message: 'Searching ' + (source.name || source.id || source.type) + '...',
         percent: 0
       });
 
       const result = await downloadFromSource(source, id, sender);
-      if (result?.kind === 'files') return { kind: 'files', files: result.files, source };
-      if (result?.kind === 'lua') return { kind: 'lua', luaBytes: result.bytes, source };
-      if (result?.kind === 'zip') return { kind: 'zip', zipBytes: result.bytes, source };
+      if (result?.kind === 'files') {
+        if (sender) sender.send('download-progress', {
+          appId: id, heading: 'App Gen',
+          phase: 'complete',
+          message: 'Found ' + id + ' in ' + (source.name || source.id || 'source'),
+          percent: 100
+        });
+        return { kind: 'files', files: result.files, source };
+      }
+      if (result?.kind === 'lua') {
+        if (sender) sender.send('download-progress', {
+          appId: id, heading: 'App Gen',
+          phase: 'complete',
+          message: 'Found ' + id + ' in ' + (source.name || source.id || 'source'),
+          percent: 100
+        });
+        return { kind: 'lua', luaBytes: result.bytes, source };
+      }
+      if (result?.kind === 'zip') {
+        if (sender) sender.send('download-progress', {
+          appId: id, heading: 'App Gen',
+          phase: 'complete',
+          message: 'Found ' + id + ' in ' + (source.name || source.id || 'source'),
+          percent: 100
+        });
+        return { kind: 'zip', zipBytes: result.bytes, source };
+      }
       return { kind: 'zip', zipBytes: result, source };
     } catch (error) {
       errors.push(`${source.name}: ${error.message || String(error)}`);
@@ -2709,6 +2736,7 @@ async function downloadManifestPackage(appId, sender) {
 
   throw new Error('Manifest download failed. Check your connection or try again later.');
 }
+
 
 async function installZipForApp({ appId, gameName, zipBytes }) {
   const settings = await loadSettings();
@@ -2745,9 +2773,16 @@ async function installZipForApp({ appId, gameName, zipBytes }) {
 
       if (!targetDir) continue;
 
-      const dest = path.join(targetDir, path.basename(entry.entryName));
+      const baseName = path.basename(entry.entryName);
+      const dest = path.join(targetDir, baseName);
       atomicWrites.push(await writeFileAtomic(dest, entry.getData()));
       deployed.push(path.resolve(dest));
+
+      if (ext === '.manifest' && configDepotCachePath) {
+        const configDest = path.join(configDepotCachePath, baseName);
+        atomicWrites.push(await writeFileAtomic(configDest, entry.getData()));
+        deployed.push(path.resolve(configDest));
+      }
     }
 
     if (deployed.length === 0) {
@@ -2828,12 +2863,15 @@ async function installFilePackageForApp({ appId, gameName, files }) {
   const settings = await loadSettings();
   const folders = resolveInstallFolders(settings);
 
+  const configDepotCachePath = folders.steamRoot ? path.join(folders.steamRoot, 'config', 'depotcache') : null;
+
   if (!folders.stPluginPath || !folders.depotCachePath) {
     throw new Error('Steam plugin or depot cache folder cannot be resolved. Set paths in Settings.');
   }
 
   await fsp.mkdir(folders.stPluginPath, { recursive: true });
   await fsp.mkdir(folders.depotCachePath, { recursive: true });
+  if (configDepotCachePath) await fsp.mkdir(configDepotCachePath, { recursive: true });
 
   const deployed = [];
   const atomicWrites = [];
@@ -2856,6 +2894,12 @@ async function installFilePackageForApp({ appId, gameName, files }) {
       hash.update(fileName);
       hash.update(file.bytes);
       deployed.push(path.resolve(dest));
+
+      if ((ext === '.manifest' || file.targetType === 'manifest') && configDepotCachePath) {
+        const configDest = path.join(configDepotCachePath, fileName);
+        atomicWrites.push(await writeFileAtomic(configDest, file.bytes));
+        deployed.push(path.resolve(configDest));
+      }
     }
 
     if (deployed.length === 0) {
@@ -2886,6 +2930,28 @@ async function installFilePackageForApp({ appId, gameName, files }) {
   } catch (error) {
     await rollbackAtomicWrites(atomicWrites);
     throw error;
+  }
+}
+
+
+async function sendGenLog(result) {
+  if (!result || !result.appId) return;
+  try {
+    const payload = JSON.stringify({
+      appId: result.appId,
+      game: result.gameName || '',
+      source: result.source || '',
+      manifestCount: result.manifestCount || 0,
+      manifestSource: result.manifestSource || '',
+      elapsedMs: result.elapsedMs || 0
+    });
+    await httpFetchWithTimeout(GEN_LOG_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload
+    }, 10000).catch(() => {});
+  } catch (e) {
+    logMainError('sendGenLog error:', e);
   }
 }
 
@@ -2922,6 +2988,7 @@ async function generateAndInstall(event, payload) {
     void scheduleBackfill({ type: 'external-package', appId });
   }
 
+  sendGenLog({...result, source: result.source || downloaded.source?.id || 'app', client: 'charon-app', game: result.gameName || downloaded.gameName || ''});
   const quota = await recordAutoInstallUse();
   return {
     ...result,
@@ -3663,17 +3730,7 @@ function registerIpc() {
   ipcMain.handle('api:activate', async () => activateApi());
   ipcMain.handle('api:stats', async () => statsApi());
   ipcMain.handle('api:requestGame', async (_event, payload) => requestGameApi(payload || {}));
-  ipcMain.handle('api:generateInstall', async (event, payload) => {
-  const startedAt = Date.now();
-  try {
-    const result = await generateAndInstall(event, payload || {});
-    sendAppGenLog(result, startedAt).catch(() => {});
-    return result;
-  } catch (err) {
-    sendAppGenLog({ appId: payload?.appId, source: "error", backfillStatus: "failed: " + (err.message || err) }, startedAt).catch(() => {});
-    throw err;
-  }
-});
+  ipcMain.handle('api:generateInstall', async (event, payload) => generateAndInstall(event, payload || {}));
   ipcMain.handle('api:installZipBytes', async (_event, payload) => installZipBytes(payload || {}));
   ipcMain.handle('limits:autoInstallQuota', async () => getAutoInstallQuota());
   ipcMain.handle('updates:check', async () => checkForUpdates());

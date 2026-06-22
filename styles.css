@@ -1148,6 +1148,10 @@ p {
     display: none;
   }
 
+  #install-status-panel {
+    display: grid !important;
+  }
+
   .split,
   .settings-grid {
     grid-template-columns: 1fr;

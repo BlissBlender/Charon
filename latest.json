@@ -1,6 +1,6 @@
 {
-  "version": "1.0.18",
-  "sha256": "ac08d3af8d0b4c1a1d9edea2aa536840dcde1143a01cf3d4a0cf0753f97da452",
-  "releaseNotes": "Fixes progress bar colors (green for success, red for error) and source labels (proper English names like Database 1, Database 2, GameGen).",
-  "publishedAt": "2026-06-21T13:18:46.077Z"
+  "version": "2.0.0",
+  "sha256": "PENDING_REBUILD",
+  "releaseNotes": "Complete rewrite of gen system: DB1.lua->DB1.zip->DB2.lua->DB2.zip->GameGen flow with automatic manifest enrichment from vaults.",
+  "publishedAt": "2026-06-21T13:48:31.031Z"
 }
