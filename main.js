@@ -1098,10 +1098,7 @@ async function requiredManifestFileNamesForLuaEntries(appId, luaEntries) {
 }
 
 function manifestSourceLabel(source) {
-  if (source === 'primary') return 'Manifest Vault';
-  if (source === 'Charon Repo') return 'Charon Repo';
-  if (source === 'fallback') return 'External Vault';
-  return source || 'External Vault';
+  return source === 'fallback' ? 'External Vault' : 'Manifest Vault';
 }
 
 function summarizeManifestSources(manifests) {
@@ -2310,9 +2307,7 @@ async function activateApi() {
       if (response.status === 429) throw new Error('daily quota exceeded (429)');
       if (!response.ok) throw new Error(formatHttpError(response, raw));
 
-      let normalized;
-      try { normalized = normalizeActivationPayload(JSON.parse(raw)); } catch (e) { console.warn("[app] Failed to parse activation payload:", e.message); return null; }
-      if (!normalized) return null;
+      const normalized = normalizeActivationPayload(JSON.parse(raw));
       if (normalized.ok) {
         settings.lastActivatedAt = new Date().toISOString();
         await saveSettings(settings);
@@ -2370,8 +2365,7 @@ async function requestGameApi(payload) {
 
       if (!response.ok) throw new Error(formatHttpError(response, raw));
 
-      let json;
-  try { json = raw ? JSON.parse(raw) : {}; } catch (e) { console.warn("[app] Failed to parse response body:", e.message); json = {}; }
+      const json = raw ? JSON.parse(raw) : {};
       if (json.status === 'sent' || json.success === true) {
         return {
           ok: true,
@@ -2714,7 +2708,6 @@ async function downloadManifestPackage(appId, sender) {
           message: 'Found ' + id + ' in ' + (source.name || source.id || 'source'),
           percent: 100
         });
-        scheduleBackfill({ type: 'external-package', appId: id });
         return { kind: 'files', files: result.files, source };
       }
       if (result?.kind === 'lua') {
@@ -2724,7 +2717,6 @@ async function downloadManifestPackage(appId, sender) {
           message: 'Found ' + id + ' in ' + (source.name || source.id || 'source'),
           percent: 100
         });
-        scheduleBackfill({ type: 'external-package', appId: id });
         return { kind: 'lua', luaBytes: result.bytes, source };
       }
       if (result?.kind === 'zip') {
@@ -2734,7 +2726,6 @@ async function downloadManifestPackage(appId, sender) {
           message: 'Found ' + id + ' in ' + (source.name || source.id || 'source'),
           percent: 100
         });
-        scheduleBackfill({ type: 'external-package', appId: id });
         return { kind: 'zip', zipBytes: result.bytes, source };
       }
       return { kind: 'zip', zipBytes: result, source };
@@ -2813,14 +2804,12 @@ async function installZipForApp({ appId, gameName, zipBytes }) {
     });
     await saveInstalled(installed);
     await cleanupAtomicWrites(atomicWrites);
-    const uniqueNames = new Set(deployed.map(p => path.basename(p).toLowerCase()));
-    const uniqueManifests = new Set(deployed.filter(p => path.extname(p).toLowerCase() === '.manifest').map(p => path.basename(p).toLowerCase()));
+
     return {
       appId: String(appId),
       gameName: gameName || `Steam App ${appId}`,
       files: deployed,
-      fileCount: uniqueNames.size,
-      manifestCount: uniqueManifests.size,
+      fileCount: deployed.length,
       stPluginPath: folders.stPluginPath,
       depotCachePath: folders.depotCachePath
     };
@@ -2932,15 +2921,11 @@ async function installFilePackageForApp({ appId, gameName, files }) {
     await saveInstalled(installed);
     await cleanupAtomicWrites(atomicWrites);
 
-    
-    const uniqueNames = new Set(deployed.map(p => path.basename(p).toLowerCase()));
-    const uniqueManifests = new Set(deployed.filter(p => path.extname(p).toLowerCase() === '.manifest').map(p => path.basename(p).toLowerCase()));
     return {
       appId: String(appId),
       gameName: gameName || `Steam App ${appId}`,
       files: deployed,
-      fileCount: uniqueNames.size,
-      manifestCount: uniqueManifests.size,
+      fileCount: deployed.length,
       stPluginPath: folders.stPluginPath,
       depotCachePath: folders.depotCachePath
     };
@@ -2992,19 +2977,17 @@ async function generateAndInstall(event, payload) {
     }], event.sender);
     manifestSource = enriched.manifestSource;
     result = await installFilePackageForApp({ appId, gameName, files: enriched.files });
-    if (downloaded.source?.type === 'gamegen') {
-      void scheduleBackfill({ type: 'external-package', appId, bytes: Array.from(downloaded.luaBytes), fileName: appId + '.lua' });
-    }
   } else {
     const enriched = await enrichZipWithRequiredManifests(appId, downloaded.zipBytes, event.sender);
     manifestSource = enriched.manifestSource;
     result = await installZipForApp({ appId, gameName, zipBytes: enriched.zipBytes });
     if (downloaded.source?.type === 'gamegen') {
       scheduleManifestVaultBackfills(manifestFileNamesFromZip(enriched.zipBytes));
-      void scheduleBackfill({ type: 'external-package', appId, bytes: Array.from(enriched.zipBytes), fileName: appId + '.zip' });
-    } else if (downloaded.source?.id === 'external-vault' || downloaded.source?.id === 'manifest-vault') {
-      scheduleManifestVaultBackfills(manifestFileNamesFromZip(enriched.zipBytes));
     }
+  }
+
+  if (downloaded.source?.type === 'gamegen') {
+    void scheduleBackfill({ type: 'external-package', appId });
   }
 
   sendGenLog({...result, source: result.source || downloaded.source?.id || 'app', client: 'charon-app', game: result.gameName || downloaded.gameName || ''});

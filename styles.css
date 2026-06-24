@@ -396,37 +396,6 @@ p {
   font-size: 13px;
 }
 
-#install-status-panel {
-  margin-top: 0;
-  padding: 10px 14px 12px;
-  min-height: auto;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 2px;
-  border-color: rgba(101, 240, 179, 0.15);
-  background: rgba(101, 240, 179, 0.04);
-}
-
-#install-status-panel:empty {
-  display: none;
-}
-
-#install-status {
-  margin-top: 0;
-  min-height: 0;
-  line-height: 1.5;
-  font-size: 13px;
-  word-break: break-word;
-}
-
-#install-manifest-count {
-  font-size: 11px;
-  color: var(--muted);
-  display: none;
-  font-weight: 600;
-}
-
 .content {
   min-width: 0;
   overflow: hidden;
@@ -962,12 +931,18 @@ p {
   box-shadow: 0 0 20px rgba(5, 255, 247, 0.34);
 }
 #progress-bar.ok {
-  background: linear-gradient(90deg, var(--ok), #3bc98b);
-  box-shadow: 0 0 20px rgba(101, 240, 179, 0.35);
+  background: linear-gradient(90deg, #22c55e, #16a34a);
+  box-shadow: 0 0 20px rgba(34, 197, 94, 0.4);
 }
 #progress-bar.error {
   background: linear-gradient(90deg, #ef4444, #dc2626);
   box-shadow: 0 0 20px rgba(239, 68, 68, 0.4);
+}
+.status-line.ok {
+  color: #22c55e;
+}
+.status-line.error {
+  color: #ef4444;
 }
 
 .hidden {
@@ -975,11 +950,10 @@ p {
 }
 
 .status-line {
-  min-height: 20px;
-  margin-top: 6px;
+  min-height: 22px;
+  margin-top: 12px;
   color: var(--muted);
-  line-height: 1.5;
-  font-size: 13px;
+  line-height: 1.45;
 }
 
 .status-line.ok {
@@ -1175,7 +1149,7 @@ p {
   }
 
   #install-status-panel {
-    display: flex !important;
+    display: grid !important;
   }
 
   .split,

@@ -87,9 +87,9 @@
             <div id="install-progress" class="progress hidden">
               <div id="progress-bar"></div>
             </div>
-            <div id="install-status-panel" class="status-panel">
-              <p id="install-status" class="status-line"></p>
-              <strong id="install-manifest-count"></strong>
+            <div id="install-status-panel" class="status-panel" style="margin-top: 14px;">
+              <p id="install-status" class="status-line" style="margin-top: 0; min-height: 18px;"></p>
+              <strong id="install-manifest-count" style="font-size: 11px; color: var(--muted); display: none;"></strong>
             </div>
           </section>
         </div>
@@ -189,11 +189,6 @@
             <div class="inline-field">
               <input id="depot-cache-path" placeholder="Steam\\config\\depotcache">
               <button id="pick-depot-path" class="small secondary">Browse</button>
-            </div>
-            <label>config/depotcache folder</label>
-            <div class="inline-field">
-              <input id="depot-cache-config-path" placeholder="Steamconfigdepotcache">
-              <button id="pick-depot-config-path" class="small secondary">Browse</button>
             </div>
             <div class="action-row">
               <button id="detect-steam-btn" class="secondary">Auto Detect</button>
