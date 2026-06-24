@@ -75,6 +75,8 @@ const els = {
   pickSteamRoot: $('#pick-steam-root'),
   pickPluginPath: $('#pick-plugin-path'),
   pickDepotPath: $('#pick-depot-path'),
+  pickDepotConfigPath: $('#pick-depot-config-path'),
+  configDepotCachePath: $('#depot-cache-config-path'),
   settingsStatus: $('#settings-status'),
   restartSteamSettingsBtn: $('#restart-steam-settings-btn'),
   settingsVersionLabel: $('#settings-version-label'),
@@ -350,11 +352,12 @@ function hasSteamConfig(settings) {
 }
 
 function defaultSteamFoldersFromRoot(folder) {
-  const steamRoot = String(folder || '').trim().replace(/[\\/]+$/, '');
+  const steamRoot = String(folder || '').trim().replace(/[/]+$/, '');
   return {
     steamRoot,
-    stPluginPath: steamRoot ? `${steamRoot}\\config\\stplug-in` : '',
-    depotCachePath: steamRoot ? `${steamRoot}\\depotcache` : ''
+    stPluginPath: steamRoot ? steamRoot + '\config\stplug-in' : '',
+    depotCachePath: steamRoot ? steamRoot + '\depotcache' : '',
+    configDepotCachePath: steamRoot ? steamRoot + '\config\depotcache' : ''
   };
 }
 
@@ -483,13 +486,15 @@ function fillSettingsForm(settings) {
   els.steamRoot.value = settings.steamRoot || '';
   els.stPluginPath.value = settings.stPluginPath || '';
   els.depotCachePath.value = settings.depotCachePath || '';
+  els.configDepotCachePath.value = settings.configDepotCachePath || '';
 }
 
 function readSettingsForm() {
   return {
     steamRoot: els.steamRoot.value.trim(),
     stPluginPath: els.stPluginPath.value.trim(),
-    depotCachePath: els.depotCachePath.value.trim()
+    depotCachePath: els.depotCachePath.value.trim(),
+    configDepotCachePath: els.configDepotCachePath.value.trim()
   };
 }
 
@@ -614,6 +619,7 @@ async function detectSteam() {
     els.steamRoot.value = detected.steamRoot;
     els.stPluginPath.value = detected.stPluginPath;
     els.depotCachePath.value = detected.depotCachePath;
+    els.configDepotCachePath.value = detected.configDepotCachePath || detected.steamRoot + '\config\depotcache';
     await saveSettings({ log: false });
     setStatus(els.settingsStatus, `Steam detected: ${detected.steamRoot}`, 'ok');
     void addActivity('Steam paths auto detected.', 'ok');
@@ -852,7 +858,7 @@ async function installSelected() {
   setBusy(els.installSelectedBtn, true, 'Installing');
   els.installProgress.classList.remove('hidden');
   els.progressBar.style.width = '0%';
-  setStatus(els.installStatus, 'Contacting manifest service...');
+  setStatus(els.installStatus, 'Connecting to Manifest Service...');
   void addActivity(`Manifest install started for ${state.selectedGame.name} (${state.selectedGame.appId}).`);
 
   try {
@@ -862,13 +868,13 @@ async function installSelected() {
       gameName: state.selectedGame.name
     });
     const sourceLabel = result.sourceType === 'database-url' || result.sourceType === 'lua-url' || result.sourceId === 'github-lua'
-      ? 'Used Charon Repo'
-      : 'Used Other';
-    const manifestLabel = result.manifestSource
-      ? ` Manifest source: ${result.manifestSource}.`
+      ? 'Charon Repo'
+      : result.sourceType === 'gamegen' ? 'External API' : result.sourceName || 'External API';
+    const manifestLabel = result.manifestSource && result.manifestSource !== sourceLabel
+      ? ' + ' + result.manifestSource
       : '';
-    setStatus(els.installStatus, `${sourceLabel}.${manifestLabel} Installed ${result.fileCount} file(s) (${result.manifestCount || result.fileCount || 0} manifest(s)). Restart Steam to reload changes.`, 'ok');
-    void addActivity(`${sourceLabel}.${manifestLabel} Injected ${result.fileCount} file(s) for ${state.selectedGame.name} (${state.selectedGame.appId}). ${describeInstalledFiles(result)}`, 'ok');
+    setStatus(els.installStatus, `Installed ${result.fileCount} file(s) (${result.manifestCount || 0} manifests) from ${sourceLabel}${manifestLabel}. Restart Steam to reload changes.`, 'ok');
+    void addActivity(`${sourceLabel}${manifestLabel} Injected ${result.fileCount} file(s) for ${state.selectedGame.name} (${state.selectedGame.appId}). ${describeInstalledFiles(result)}`, 'ok');
     if (result.quota) {
       els.autoQuotaLabel.textContent = `Automatic installs: ${result.quota.remaining}/${result.quota.limit} left in 24h.`;
       els.autoQuotaLabel.classList.toggle('limit-reached', result.quota.remaining <= 0);
@@ -1046,7 +1052,7 @@ async function hydrateManifestMetadata({ force = false } = {}) {
         forceBanner: force || !record.bannerUrl
       });
       Object.assign(record, {
-        gameName: record.gameName || details.name,
+        gameName: details.name || record.gameName,
         name: details.name,
         shortDescription: details.shortDescription,
         releaseDate: details.releaseDate,
@@ -1078,9 +1084,9 @@ function renderManifests() {
 
   els.manifestList.innerHTML = state.manifests.map((record) => `
     <article class="table-row">
-      ${gameThumbnail({ src: record.bannerUrl || record.image, appId: record.appId, title: record.gameName || record.name || `Steam App ${record.appId}` })}
+      ${gameThumbnail({ src: record.bannerUrl || record.image, appId: record.appId, title: record.name || record.gameName || `Steam App ${record.appId}` })}
       <div class="row-main">
-        <strong>${escapeText(record.gameName || record.name || `Steam App ${record.appId}`)}</strong>
+        <strong>${escapeText(record.name || record.gameName || `Steam App ${record.appId}`)}</strong>
         <span>App ID ${escapeText(record.appId)} - ${escapeText((record.files || []).length)} file(s) - ${escapeText(formatDate(record.installedAt))}</span>
       </div>
       <div class="table-actions">
@@ -1303,6 +1309,7 @@ function bindEvents() {
   els.pickSteamRoot.addEventListener('click', () => pickFolder(els.steamRoot));
   els.pickPluginPath.addEventListener('click', () => pickFolder(els.stPluginPath));
   els.pickDepotPath.addEventListener('click', () => pickFolder(els.depotCachePath));
+  els.pickDepotConfigPath.addEventListener('click', () => pickFolder(els.configDepotCachePath));
   els.setupDetectBtn.addEventListener('click', setupAutoDetectSteam);
   els.setupBrowseBtn.addEventListener('click', setupChooseSteamFolder);
   els.setupSettingsBtn.addEventListener('click', openSettingsFromSetup);
@@ -1346,23 +1353,7 @@ function bindEvents() {
     els.installProgress.classList.remove('hidden');
     els.progressBar.style.width = `${Math.round(payload.percent || 0)}%`;
     var pct = Math.round(payload.percent || 0);
-    if (payload.message) {
-      setStatus(els.installStatus, payload.message + ' ' + pct + '%');
-    } else {
-      var msg =
-        payload.phase === 'source'
-          ? 'Preparing manifest download...'
-          : payload.phase === 'lua'
-          ? 'Checking repository for Lua data...'
-          : payload.phase === 'manifest'
-          ? 'Resolving manifest dependencies...'
-          : payload.phase === 'download'
-          ? 'Downloading package...'
-          : payload.phase === 'repository'
-          ? 'Checking package map...'
-          : 'Contacting manifest service...';
-      setStatus(els.installStatus, msg + ' ' + pct + '%');
-    }
+        setStatus(els.installStatus, 'Connecting to Manifest Service... ' + pct + '%');
   });
 
   window.charon.onUpdateProgress((payload) => {
