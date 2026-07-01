@@ -71,10 +71,12 @@ const els = {
   steamRoot: $('#steam-root'),
   stPluginPath: $('#st-plugin-path'),
   depotCachePath: $('#depot-cache-path'),
+  configDepotCachePath: $('#config-depot-cache-path'),
   detectSteamBtn: $('#detect-steam-btn'),
   pickSteamRoot: $('#pick-steam-root'),
   pickPluginPath: $('#pick-plugin-path'),
   pickDepotPath: $('#pick-depot-path'),
+  pickConfigDepotPath: $('#pick-config-depot-path'),
   settingsStatus: $('#settings-status'),
   restartSteamSettingsBtn: $('#restart-steam-settings-btn'),
   settingsVersionLabel: $('#settings-version-label'),
@@ -89,6 +91,9 @@ const els = {
   updateGateButton: $('#update-gate-button'),
   setupOverlay: $('#setup-overlay'),
   setupSteamPreview: $('#setup-steam-preview'),
+  setupPluginPreview: $('#setup-plugin-preview'),
+  setupDepotPreview: $('#setup-depot-preview'),
+  setupConfigDepotPreview: $('#setup-config-depot-preview'),
   setupDetectBtn: $('#setup-detect-btn'),
   setupBrowseBtn: $('#setup-browse-btn'),
   setupSettingsBtn: $('#setup-settings-btn'),
@@ -354,7 +359,8 @@ function defaultSteamFoldersFromRoot(folder) {
   return {
     steamRoot,
     stPluginPath: steamRoot ? `${steamRoot}\\config\\stplug-in` : '',
-    depotCachePath: steamRoot ? `${steamRoot}\\depotcache` : ''
+    depotCachePath: steamRoot ? `${steamRoot}\\depotcache` : '',
+    configDepotCachePath: steamRoot ? `${steamRoot}\\config\\depotcache` : ''
   };
 }
 
@@ -479,17 +485,54 @@ function describeInstalledFiles(result) {
     .join(' | ');
 }
 
+function installSummary(result) {
+  const sourceLabel = result.sourceLabel || result.sourceName || (
+    result.sourceType === 'database-url' || result.sourceType === 'lua-url' || result.sourceId === 'github-lua'
+      ? 'Charon Repo'
+      : 'Other Source'
+  );
+  const manifestLabel = result.manifestSource || 'No additional manifest vault files';
+  const manifestCount = Number.isFinite(Number(result.manifestCount)) ? Number(result.manifestCount) : 0;
+  const luaCount = Number.isFinite(Number(result.luaCount)) ? Number(result.luaCount) : 0;
+  const sourceFileCount = Number.isFinite(Number(result.sourceFileCount)) ? Number(result.sourceFileCount) : (result.fileCount || 0);
+  const sourceLuaCount = Number.isFinite(Number(result.sourceLuaCount)) ? Number(result.sourceLuaCount) : luaCount;
+  const sourceManifestCount = Number.isFinite(Number(result.sourceManifestCount)) ? Number(result.sourceManifestCount) : manifestCount;
+  const manifestWord = manifestCount === 1 ? 'Manifest' : 'Manifests';
+  const sourceManifestWord = sourceManifestCount === 1 ? 'Manifest' : 'Manifests';
+  const vaultWord = manifestCount === 1 ? 'manifest' : 'manifests';
+  const sourceFileText = `${sourceFileCount} files - ${sourceLuaCount} Lua, ${sourceManifestCount} ${sourceManifestWord}`;
+  const vaultText = result.manifestSource
+    ? `[${manifestLabel}] ${manifestCount} ${vaultWord}`
+    : '[Manifest Vault] No additional manifest files';
+  const lines = [
+    `[${sourceLabel}] ${sourceFileText}`,
+    vaultText,
+    `Injected ${result.fileCount || 0} files (${luaCount} Lua, ${manifestCount} ${manifestWord})`,
+    '',
+    '[Paths]',
+    `- Lua:       ${result.stPluginPath || 'Not reported'}`,
+    `- Manifests: ${result.depotCachePath || 'Not reported'}`,
+  ];
+  if (result.configDepotCachePath) lines.push(`             ${result.configDepotCachePath}`);
+  lines.push('',
+    '[Required] Restart Steam to reload changes.'
+  );
+  return lines.join('\n');
+}
+
 function fillSettingsForm(settings) {
   els.steamRoot.value = settings.steamRoot || '';
   els.stPluginPath.value = settings.stPluginPath || '';
   els.depotCachePath.value = settings.depotCachePath || '';
+  els.configDepotCachePath.value = settings.configDepotCachePath || defaultSteamFoldersFromRoot(settings.steamRoot).configDepotCachePath || '';
 }
 
 function readSettingsForm() {
   return {
     steamRoot: els.steamRoot.value.trim(),
     stPluginPath: els.stPluginPath.value.trim(),
-    depotCachePath: els.depotCachePath.value.trim()
+    depotCachePath: els.depotCachePath.value.trim(),
+    configDepotCachePath: els.configDepotCachePath.value.trim()
   };
 }
 
@@ -499,7 +542,11 @@ function updateSteamSummary(settings) {
 }
 
 function updateSetupPreview(settings) {
-  els.setupSteamPreview.textContent = settings?.steamRoot || 'Not configured';
+  const folders = defaultSteamFoldersFromRoot(settings?.steamRoot || '');
+  els.setupSteamPreview.textContent = settings?.steamRoot || '...\\Steam';
+  if (els.setupPluginPreview) els.setupPluginPreview.textContent = folders.stPluginPath || '...\\Steam\\config\\stplug-in';
+  if (els.setupDepotPreview) els.setupDepotPreview.textContent = folders.depotCachePath || '...\\Steam\\depotcache';
+  if (els.setupConfigDepotPreview) els.setupConfigDepotPreview.textContent = folders.configDepotCachePath || '...\\Steam\\config\\depotcache';
 }
 
 function maybeShowFirstRunSetup(settings) {
@@ -538,7 +585,8 @@ async function setupAutoDetectSteam() {
     await saveSetupSettings({
       steamRoot: detected.steamRoot,
       stPluginPath: detected.stPluginPath,
-      depotCachePath: detected.depotCachePath
+      depotCachePath: detected.depotCachePath,
+      configDepotCachePath: detected.configDepotCachePath
     }, 'First-run setup completed with auto detect.');
   } catch (error) {
     setStatus(els.setupStatus, error.message || String(error), 'error');
@@ -614,6 +662,7 @@ async function detectSteam() {
     els.steamRoot.value = detected.steamRoot;
     els.stPluginPath.value = detected.stPluginPath;
     els.depotCachePath.value = detected.depotCachePath;
+    els.configDepotCachePath.value = detected.configDepotCachePath;
     await saveSettings({ log: false });
     setStatus(els.settingsStatus, `Steam detected: ${detected.steamRoot}`, 'ok');
     void addActivity('Steam paths auto detected.', 'ok');
@@ -861,14 +910,8 @@ async function installSelected() {
       appId: state.selectedGame.appId,
       gameName: state.selectedGame.name
     });
-    const sourceLabel = result.sourceType === 'database-url' || result.sourceType === 'lua-url' || result.sourceId === 'github-lua'
-      ? 'Used Charon Repo'
-      : 'Used Other';
-    const manifestLabel = result.manifestSource
-      ? ` Manifest source: ${result.manifestSource}.`
-      : '';
-    setStatus(els.installStatus, `${sourceLabel}.${manifestLabel} Installed ${result.fileCount} file(s) (${result.manifestCount || result.fileCount || 0} manifest(s)). Restart Steam to reload changes.`, 'ok');
-    void addActivity(`${sourceLabel}.${manifestLabel} Injected ${result.fileCount} file(s) for ${state.selectedGame.name} (${state.selectedGame.appId}). ${describeInstalledFiles(result)}`, 'ok');
+    setStatus(els.installStatus, installSummary(result), 'ok');
+    void addActivity(`Injected manifests for ${state.selectedGame.name} (${state.selectedGame.appId}). ${installSummary(result)} ${describeInstalledFiles(result)}`, 'ok');
     if (result.quota) {
       els.autoQuotaLabel.textContent = `Automatic installs: ${result.quota.remaining}/${result.quota.limit} left in 24h.`;
       els.autoQuotaLabel.classList.toggle('limit-reached', result.quota.remaining <= 0);
@@ -1303,6 +1346,7 @@ function bindEvents() {
   els.pickSteamRoot.addEventListener('click', () => pickFolder(els.steamRoot));
   els.pickPluginPath.addEventListener('click', () => pickFolder(els.stPluginPath));
   els.pickDepotPath.addEventListener('click', () => pickFolder(els.depotCachePath));
+  els.pickConfigDepotPath.addEventListener('click', () => pickFolder(els.configDepotCachePath));
   els.setupDetectBtn.addEventListener('click', setupAutoDetectSteam);
   els.setupBrowseBtn.addEventListener('click', setupChooseSteamFolder);
   els.setupSettingsBtn.addEventListener('click', openSettingsFromSetup);

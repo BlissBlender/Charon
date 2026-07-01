@@ -295,6 +295,7 @@ function defaultSettings() {
     steamRoot: '',
     stPluginPath: '',
     depotCachePath: '',
+    configDepotCachePath: '',
     machineId: crypto.randomUUID().replaceAll('-', ''),
     setupDismissed: false,
     lastActivatedAt: '',
@@ -502,13 +503,31 @@ function normalizeSettings(settings) {
   const normalized = { ...settings };
   const steamRoot = String(normalized.steamRoot || '').trim().replace(/[\\/]+$/, '');
   const depotCachePath = String(normalized.depotCachePath || '').trim();
+  let configDepotCachePath = String(normalized.configDepotCachePath || '').trim();
   const legacyDepotPath = steamRoot ? path.join(steamRoot, 'config', 'depotcache') : '';
   const currentDepotPath = steamRoot ? path.join(steamRoot, 'depotcache') : '';
+  const normalizedSteamRoot = steamRoot.replace(/[\\/]+/g, '\\').toLowerCase();
+  const staleSmokeSteamRoot = normalizedSteamRoot.includes('\\temp\\charon-manual-import-') ||
+    normalizedSteamRoot.includes('\\temp\\charon-auto-inject-') ||
+    normalizedSteamRoot.includes('\\temp\\charon-lua-source-') ||
+    normalizedSteamRoot.includes('\\temp\\charon-database-zip-');
+
+  if (staleSmokeSteamRoot && !fs.existsSync(path.join(steamRoot, 'steam.exe'))) {
+    normalized.steamRoot = '';
+    normalized.stPluginPath = '';
+    normalized.depotCachePath = '';
+    normalized.configDepotCachePath = '';
+    return normalized;
+  }
 
   normalized.steamRoot = steamRoot;
   if (steamRoot && depotCachePath && path.normalize(depotCachePath).toLowerCase() === path.normalize(legacyDepotPath).toLowerCase()) {
     normalized.depotCachePath = currentDepotPath;
   }
+  if (steamRoot && !configDepotCachePath) {
+    configDepotCachePath = legacyDepotPath;
+  }
+  normalized.configDepotCachePath = configDepotCachePath;
 
   return normalized;
 }
@@ -776,9 +795,19 @@ async function loadInstalled() {
   const file = await readJson(installedPath(), { records: [] });
   if (!Array.isArray(file.records)) file.records = [];
   const removedIds = await loadRemovedManifestIds();
+  const smokeNames = new Set([
+    'Automatic Inject Smoke',
+    'Manual Import Smoke',
+    'Database Source Smoke',
+    'Database Fallback Smoke',
+    'Database ZIP Smoke',
+    'Remove Smoke'
+  ]);
+  const smokeAppIds = new Set(['777777', '123456', '654321']);
   file.records = file.records.filter((record) => {
     const appId = String(record?.appId || '').trim();
-    return appId && !removedIds.has(appId);
+    const gameName = String(record?.gameName || '').trim();
+    return appId && !removedIds.has(appId) && !smokeNames.has(gameName) && !smokeAppIds.has(appId);
   });
   file.records = mergeRecordsByAppId({ records: [] }, file, removedIds).records;
   file.records.sort((a, b) => String(a.gameName || a.appId).localeCompare(String(b.gameName || b.appId)));
@@ -1264,6 +1293,28 @@ function scheduleManifestVaultBackfills(fileNames) {
   }
 }
 
+function packageCountsFromFiles(files) {
+  const list = Array.isArray(files) ? files : [];
+  const luaCount = list.filter((file) => String(file?.name || '').toLowerCase().endsWith('.lua') || file?.targetType === 'lua').length;
+  const manifestCount = list.filter((file) => String(file?.name || '').toLowerCase().endsWith('.manifest') || file?.targetType === 'manifest').length;
+  return {
+    fileCount: luaCount + manifestCount,
+    luaCount,
+    manifestCount
+  };
+}
+
+function packageCountsFromZip(zipBytes) {
+  try {
+    const zip = new AdmZip(zipBytes);
+    return packageCountsFromFiles(zip.getEntries()
+      .filter((entry) => !entry.isDirectory)
+      .map((entry) => ({ name: entry.entryName })));
+  } catch {
+    return { fileCount: 0, luaCount: 0, manifestCount: 0 };
+  }
+}
+
 function formatHttpError(response, bodyText) {
   let detail = '';
   try {
@@ -1413,7 +1464,7 @@ async function fetchUpdateInfo() {
     updateAvailable,
     downloadUrl,
     releaseUrl,
-    notes: String(manifest.notes || '').trim(),
+    notes: String(manifest.notes || manifest.releaseNotes || '').trim(),
     sha256: String(manifest.sha256 || '').trim(),
     publishedAt: String(manifest.publishedAt || '').trim(),
     manifestUrl: UPDATE_MANIFEST_DISPLAY_URL
@@ -1880,7 +1931,8 @@ function resolveInstallFolders(settings) {
   return {
     steamRoot,
     stPluginPath: String(settings.stPluginPath || '').trim() || defaults.stPluginPath,
-    depotCachePath: String(settings.depotCachePath || '').trim() || defaults.depotCachePath
+    depotCachePath: String(settings.depotCachePath || '').trim() || defaults.depotCachePath,
+    configDepotCachePath: String(settings.configDepotCachePath || '').trim() || defaults.configDepotCachePath
   };
 }
 
@@ -2677,6 +2729,16 @@ async function downloadFromSource(source, appId, sender) {
   throw new Error('Manifest provider is unavailable.');
 }
 
+function sourceErrorLooksNotFound(message) {
+  const text = String(message || '').toLowerCase();
+  return text.includes('was not found') ||
+    text.includes('not found') ||
+    text.includes('no file found') ||
+    text.includes('database package') ||
+    text.includes('no manifest') ||
+    text.includes('404');
+}
+
 // ========== downloadManifestPackage with website-matching status messages ==========
 async function downloadManifestPackage(appId, sender) {
   const id = String(appId || '').trim();
@@ -2734,7 +2796,11 @@ async function downloadManifestPackage(appId, sender) {
     }
   }
 
-  throw new Error('Manifest download failed. Check your connection or try again later.');
+  if (errors.length && errors.every(sourceErrorLooksNotFound)) {
+    throw new Error(`No manifest found for AppID ${id}`);
+  }
+
+  throw new Error(`No manifest found for AppID ${id}`);
 }
 
 
@@ -2748,7 +2814,7 @@ async function installZipForApp({ appId, gameName, zipBytes }) {
 
   await fsp.mkdir(folders.stPluginPath, { recursive: true });
   await fsp.mkdir(folders.depotCachePath, { recursive: true });
-  const configDepotCachePath = folders.steamRoot ? path.join(folders.steamRoot, 'config', 'depotcache') : null;
+  const configDepotCachePath = folders.configDepotCachePath || null;
   if (configDepotCachePath) await fsp.mkdir(configDepotCachePath, { recursive: true });
 
   const zip = new AdmZip(zipBytes);
@@ -2763,6 +2829,8 @@ async function installZipForApp({ appId, gameName, zipBytes }) {
   }
 
   try {
+    let luaCount = 0;
+    let manifestCount = 0;
     for (const entry of zip.getEntries()) {
       if (entry.isDirectory) continue;
 
@@ -2774,6 +2842,9 @@ async function installZipForApp({ appId, gameName, zipBytes }) {
           : '';
 
       if (!targetDir) continue;
+
+      if (ext === '.lua') luaCount += 1;
+      if (ext === '.manifest') manifestCount += 1;
 
       const baseName = path.basename(entry.entryName);
       const dest = path.join(targetDir, baseName);
@@ -2810,8 +2881,11 @@ async function installZipForApp({ appId, gameName, zipBytes }) {
       gameName: gameName || `Steam App ${appId}`,
       files: deployed,
       fileCount: deployed.length,
+      luaCount,
+      manifestCount,
       stPluginPath: folders.stPluginPath,
-      depotCachePath: folders.depotCachePath
+      depotCachePath: folders.depotCachePath,
+      configDepotCachePath
     };
   } catch (error) {
     await rollbackAtomicWrites(atomicWrites);
@@ -2852,8 +2926,11 @@ async function installLuaForApp({ appId, gameName, luaBytes }) {
       gameName: gameName || `Steam App ${appId}`,
       files: [resolvedDest],
       fileCount: 1,
+      luaCount: 1,
+      manifestCount: 0,
       stPluginPath: folders.stPluginPath,
-      depotCachePath: folders.depotCachePath
+      depotCachePath: folders.depotCachePath,
+      configDepotCachePath: folders.configDepotCachePath || null
     };
   } catch (error) {
     await rollbackAtomicWrites(atomicWrites);
@@ -2865,7 +2942,7 @@ async function installFilePackageForApp({ appId, gameName, files }) {
   const settings = await loadSettings();
   const folders = resolveInstallFolders(settings);
 
-  const configDepotCachePath = folders.steamRoot ? path.join(folders.steamRoot, 'config', 'depotcache') : null;
+  const configDepotCachePath = folders.configDepotCachePath || null;
 
   if (!folders.stPluginPath || !folders.depotCachePath) {
     throw new Error('Steam plugin or depot cache folder cannot be resolved. Set paths in Settings.');
@@ -2880,6 +2957,8 @@ async function installFilePackageForApp({ appId, gameName, files }) {
   const hash = crypto.createHash('sha256');
 
   try {
+    let luaCount = 0;
+    let manifestCount = 0;
     for (const file of Array.isArray(files) ? files : []) {
       const fileName = path.basename(String(file?.name || ''));
       const ext = path.extname(fileName).toLowerCase();
@@ -2890,6 +2969,9 @@ async function installFilePackageForApp({ appId, gameName, files }) {
           : '';
 
       if (!fileName || !targetDir || !Buffer.isBuffer(file.bytes)) continue;
+
+      if (file.targetType === 'lua' || ext === '.lua') luaCount += 1;
+      if (file.targetType === 'manifest' || ext === '.manifest') manifestCount += 1;
 
       const dest = path.join(targetDir, fileName);
       atomicWrites.push(await writeFileAtomic(dest, file.bytes));
@@ -2926,8 +3008,11 @@ async function installFilePackageForApp({ appId, gameName, files }) {
       gameName: gameName || `Steam App ${appId}`,
       files: deployed,
       fileCount: deployed.length,
+      luaCount,
+      manifestCount,
       stPluginPath: folders.stPluginPath,
-      depotCachePath: folders.depotCachePath
+      depotCachePath: folders.depotCachePath,
+      configDepotCachePath
     };
   } catch (error) {
     await rollbackAtomicWrites(atomicWrites);
@@ -2939,13 +3024,34 @@ async function installFilePackageForApp({ appId, gameName, files }) {
 async function sendGenLog(result) {
   if (!result || !result.appId) return;
   try {
+    let game = null;
+    try {
+      const details = await fetchSteamAppDetails(result.appId);
+      game = {
+        appId: String(result.appId),
+        name: details?.name || result.gameName || `Steam App ${result.appId}`,
+        publisher: details?.publisher || '',
+        releaseDate: details?.releaseDate || '',
+        banner: details?.bannerUrl || details?.header_image || ''
+      };
+    } catch {
+      game = {
+        appId: String(result.appId),
+        name: result.gameName || `Steam App ${result.appId}`
+      };
+    }
+
     const payload = JSON.stringify({
       appId: result.appId,
-      game: result.gameName || '',
+      game,
       source: result.source || '',
       manifestCount: result.manifestCount || 0,
       manifestSource: result.manifestSource || '',
-      elapsedMs: result.elapsedMs || 0
+      fileSize: result.fileSize || '',
+      elapsedMs: result.elapsedMs || 0,
+      backfillStatus: result.backfillStatus || 'Not applicable',
+      user: result.user || 'Charon App',
+      genType: 'app'
     });
     await httpFetchWithTimeout(GEN_LOG_ENDPOINT, {
       method: 'POST',
@@ -2960,16 +3066,20 @@ async function sendGenLog(result) {
 async function generateAndInstall(event, payload) {
   const appId = String(payload.appId || '').trim();
   const gameName = String(payload.gameName || '').trim();
+  const startedAt = Date.now();
   await assertAutoInstallQuota();
   const downloaded = await downloadManifestPackage(appId, event.sender);
   let manifestSource = '';
+  let sourceCounts = { fileCount: 0, luaCount: 0, manifestCount: 0 };
   let result;
 
   if (downloaded.kind === 'files') {
+    sourceCounts = packageCountsFromFiles(downloaded.files);
     const enriched = await enrichFilesWithRequiredManifests(appId, downloaded.files, event.sender);
     manifestSource = enriched.manifestSource;
     result = await installFilePackageForApp({ appId, gameName, files: enriched.files });
   } else if (downloaded.kind === 'lua') {
+    sourceCounts = { fileCount: 1, luaCount: 1, manifestCount: 0 };
     const enriched = await enrichFilesWithRequiredManifests(appId, [{
       name: `${appId}.lua`,
       bytes: downloaded.luaBytes,
@@ -2978,6 +3088,7 @@ async function generateAndInstall(event, payload) {
     manifestSource = enriched.manifestSource;
     result = await installFilePackageForApp({ appId, gameName, files: enriched.files });
   } else {
+    sourceCounts = packageCountsFromZip(downloaded.zipBytes);
     const enriched = await enrichZipWithRequiredManifests(appId, downloaded.zipBytes, event.sender);
     manifestSource = enriched.manifestSource;
     result = await installZipForApp({ appId, gameName, zipBytes: enriched.zipBytes });
@@ -2990,13 +3101,29 @@ async function generateAndInstall(event, payload) {
     void scheduleBackfill({ type: 'external-package', appId });
   }
 
-  sendGenLog({...result, source: result.source || downloaded.source?.id || 'app', client: 'charon-app', game: result.gameName || downloaded.gameName || ''});
+  void sendGenLog({
+    ...result,
+    source: downloaded.source?.id || downloaded.source?.type || 'app',
+    manifestSource,
+    manifestCount: Array.isArray(result.files)
+      ? result.files.filter((file) => String(file).toLowerCase().endsWith('.manifest')).length
+      : 0,
+    elapsedMs: Date.now() - startedAt,
+    backfillStatus: downloaded.source?.type === 'gamegen'
+      ? 'Backfill scheduled'
+      : 'Not required',
+    user: 'Charon App'
+  });
   const quota = await recordAutoInstallUse();
   return {
     ...result,
     sourceId: downloaded.source.id,
     sourceName: downloaded.source.name,
     sourceType: downloaded.source.type,
+    sourceLabel: downloaded.source.type === 'gamegen' ? 'External API' : 'Charon Repo',
+    sourceFileCount: sourceCounts.fileCount,
+    sourceLuaCount: sourceCounts.luaCount,
+    sourceManifestCount: sourceCounts.manifestCount,
     manifestSource,
     quota
   };
@@ -3099,10 +3226,12 @@ async function withIsolatedSmokeDataRoot(prefix, task) {
 }
 
 async function runManualImportSmokeTest() {
+  return withIsolatedSmokeDataRoot('charon-manual-import-data-', async () => {
   const root = await fsp.mkdtemp(path.join(os.tmpdir(), 'charon-manual-import-'));
   const fakeSteam = path.join(root, 'Steam');
   const stPluginPath = path.join(fakeSteam, 'config', 'stplug-in');
   const depotCachePath = path.join(fakeSteam, 'depotcache');
+  const configDepotCachePath = path.join(fakeSteam, 'config', 'depotcache');
 
   try {
     await fsp.mkdir(stPluginPath, { recursive: true });
@@ -3112,7 +3241,8 @@ async function runManualImportSmokeTest() {
     await saveSettings({
       steamRoot: fakeSteam,
       stPluginPath,
-      depotCachePath
+      depotCachePath,
+      configDepotCachePath
     });
 
     const zip = new AdmZip();
@@ -3127,24 +3257,31 @@ async function runManualImportSmokeTest() {
 
     const luaExists = fs.existsSync(path.join(stPluginPath, 'smoke.lua'));
     const manifestExists = fs.existsSync(path.join(depotCachePath, 'smoke.manifest'));
-    const ok = result.fileCount === 2 && luaExists && manifestExists;
+    const configManifestExists = fs.existsSync(path.join(configDepotCachePath, 'smoke.manifest'));
+    const ok = result.luaCount === 1 && result.manifestCount === 1 && result.fileCount >= 3 && luaExists && manifestExists && configManifestExists;
 
     console.log(JSON.stringify({
       ok,
       fileCount: result.fileCount,
+      luaCount: result.luaCount,
+      manifestCount: result.manifestCount,
       luaExists,
-      manifestExists
+      manifestExists,
+      configManifestExists
     }));
   } finally {
     await fsp.rm(root, { recursive: true, force: true });
   }
+  });
 }
 
-async function runLuaSourceSmokeTest() {
-  const root = await fsp.mkdtemp(path.join(os.tmpdir(), 'charon-lua-source-'));
+async function runAutomaticInjectSmokeTest() {
+  return withIsolatedSmokeDataRoot('charon-auto-inject-data-', async () => {
+  const root = await fsp.mkdtemp(path.join(os.tmpdir(), 'charon-auto-inject-'));
   const fakeSteam = path.join(root, 'Steam');
   const stPluginPath = path.join(fakeSteam, 'config', 'stplug-in');
   const depotCachePath = path.join(fakeSteam, 'depotcache');
+  const configDepotCachePath = path.join(fakeSteam, 'config', 'depotcache');
 
   try {
     await fsp.mkdir(stPluginPath, { recursive: true });
@@ -3154,7 +3291,56 @@ async function runLuaSourceSmokeTest() {
     await saveSettings({
       steamRoot: fakeSteam,
       stPluginPath,
-      depotCachePath
+      depotCachePath,
+      configDepotCachePath
+    });
+
+    const appId = '777777';
+    const result = await installDownloadedPackage(appId, 'Automatic Inject Smoke', {
+      kind: 'files',
+      files: [
+        { name: `${appId}.lua`, bytes: Buffer.from('-- auto smoke lua\n', 'utf8'), targetType: 'lua' },
+        { name: '777778_123456789.manifest', bytes: Buffer.from('auto smoke manifest\n', 'utf8'), targetType: 'manifest' }
+      ]
+    });
+
+    const luaExists = fs.existsSync(path.join(stPluginPath, `${appId}.lua`));
+    const manifestExists = fs.existsSync(path.join(depotCachePath, '777778_123456789.manifest'));
+    const configManifestExists = fs.existsSync(path.join(configDepotCachePath, '777778_123456789.manifest'));
+    const ok = result.luaCount === 1 && result.manifestCount === 1 && result.fileCount >= 3 && luaExists && manifestExists && configManifestExists;
+
+    console.log(JSON.stringify({
+      ok,
+      fileCount: result.fileCount,
+      luaCount: result.luaCount,
+      manifestCount: result.manifestCount,
+      luaExists,
+      manifestExists,
+      configManifestExists
+    }));
+  } finally {
+    await fsp.rm(root, { recursive: true, force: true });
+  }
+  });
+}
+
+async function runLuaSourceSmokeTest() {
+  const root = await fsp.mkdtemp(path.join(os.tmpdir(), 'charon-lua-source-'));
+  const fakeSteam = path.join(root, 'Steam');
+  const stPluginPath = path.join(fakeSteam, 'config', 'stplug-in');
+  const depotCachePath = path.join(fakeSteam, 'depotcache');
+  const configDepotCachePath = path.join(fakeSteam, 'config', 'depotcache');
+
+  try {
+    await fsp.mkdir(stPluginPath, { recursive: true });
+    await fsp.mkdir(depotCachePath, { recursive: true });
+    await fsp.writeFile(path.join(fakeSteam, 'steam.exe'), '');
+
+    await saveSettings({
+      steamRoot: fakeSteam,
+      stPluginPath,
+      depotCachePath,
+      configDepotCachePath
     });
 
     const appId = '413150';
@@ -3162,14 +3348,16 @@ async function runLuaSourceSmokeTest() {
     const result = await installDownloadedPackage(appId, 'Database Source Smoke', downloaded);
     const luaExists = fs.existsSync(path.join(stPluginPath, `${appId}.lua`));
     const manifestExists = fs.existsSync(path.join(depotCachePath, '413151_4278718763097142923.manifest'));
+    const configManifestExists = fs.existsSync(path.join(configDepotCachePath, '413151_4278718763097142923.manifest'));
 
     console.log(JSON.stringify({
-      ok: downloaded.kind === 'files' && downloaded.source.id === 'charon-database-1' && luaExists && manifestExists && result.fileCount >= 4,
+      ok: downloaded.kind === 'files' && downloaded.source.id === 'charon-database-1' && luaExists && manifestExists && configManifestExists && result.fileCount >= 4,
       kind: downloaded.kind,
       sourceId: downloaded.source.id,
       sourceName: downloaded.source.name,
       luaExists,
       manifestExists,
+      configManifestExists,
       fileCount: result.fileCount
     }));
   } finally {
@@ -3790,6 +3978,12 @@ app.whenReady().then(async () => {
 
   if (process.argv.includes('--manual-import-smoke-test')) {
     await runManualImportSmokeTest();
+    exitForCliSmoke();
+    return;
+  }
+
+  if (process.argv.includes('--automatic-inject-smoke-test')) {
+    await runAutomaticInjectSmokeTest();
     exitForCliSmoke();
     return;
   }

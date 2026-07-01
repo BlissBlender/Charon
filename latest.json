@@ -1,6 +1,8 @@
 {
-  "version": "2.0.0",
-  "sha256": "PENDING_REBUILD",
-  "releaseNotes": "Complete rewrite of gen system: DB1.lua->DB1.zip->DB2.lua->DB2.zip->GameGen flow with automatic manifest enrichment from vaults.",
-  "publishedAt": "2026-06-21T13:48:31.031Z"
+  "version": "8.0.0",
+  "downloadUrl": "https://github.com/BlissBlender/Charon/releases/download/v8.0.0/Charon-8.0.0.exe",
+  "releaseUrl": "https://github.com/BlissBlender/Charon/releases/tag/v8.0.0",
+  "sha256": "5718f1ef53862d647569f0d0580f15c8ea3e97fb369a27b26406384e65d983ca",
+  "notes": "Charon 8.0.0 production release with improved inject status, dual depotcache manifest install, app GenLog, manifest enrichment, and cleaner path settings.",
+  "publishedAt": "2026-07-01T14:45:14.733Z"
 }

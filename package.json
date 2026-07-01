@@ -1,13 +1,16 @@
 {
   "name": "charon",
-  "version": "4.0.2",
+  "version": "8.0.0",
   "description": "Charon Manifest Tool",
   "main": "main.js",
   "author": "Charon",
   "license": "MIT",
   "scripts": {
     "start": "electron .",
+    "clean:dist": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"if (Test-Path dist) { Remove-Item -Recurse -Force dist }; New-Item -ItemType Directory -Force dist | Out-Null\"",
     "build": "electron-builder --win portable -p never",
+    "release:manifest": "node scripts/update-latest.js",
+    "release:build": "npm run clean:dist && npm run build && npm run release:manifest",
     "check": "node --check main.js && node --check preload.js && node --check renderer.js"
   },
   "dependencies": {

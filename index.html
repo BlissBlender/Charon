@@ -177,18 +177,23 @@
             <h3>Steam Paths</h3>
             <label>Steam root</label>
             <div class="inline-field">
-              <input id="steam-root" placeholder="Folder containing steam.exe">
+              <input id="steam-root" placeholder="Example: ...\\Steam">
               <button id="pick-steam-root" class="small secondary">Browse</button>
             </div>
             <label>stplug-in folder</label>
             <div class="inline-field">
-              <input id="st-plugin-path" placeholder="Steam\\config\\stplug-in">
+              <input id="st-plugin-path" placeholder="Example: ...\\Steam\\config\\stplug-in">
               <button id="pick-plugin-path" class="small secondary">Browse</button>
             </div>
             <label>depotcache folder</label>
             <div class="inline-field">
-              <input id="depot-cache-path" placeholder="Steam\\config\\depotcache">
+              <input id="depot-cache-path" placeholder="Example: ...\\Steam\\depotcache">
               <button id="pick-depot-path" class="small secondary">Browse</button>
+            </div>
+            <label>config depotcache folder</label>
+            <div class="inline-field">
+              <input id="config-depot-cache-path" placeholder="Example: ...\\Steam\\config\\depotcache">
+              <button id="pick-config-depot-path" class="small secondary">Browse</button>
             </div>
             <div class="action-row">
               <button id="detect-steam-btn" class="secondary">Auto Detect</button>
@@ -237,6 +242,18 @@
       <div class="setup-preview">
         <span>Steam folder</span>
         <strong id="setup-steam-preview">Not configured</strong>
+      </div>
+      <div class="setup-preview">
+        <span>Lua files</span>
+        <strong id="setup-plugin-preview">Steam\\config\\stplug-in</strong>
+      </div>
+      <div class="setup-preview">
+        <span>Manifest files</span>
+        <strong id="setup-depot-preview">...\\Steam\\depotcache</strong>
+      </div>
+      <div class="setup-preview">
+        <span>Manifest compatibility copy</span>
+        <strong id="setup-config-depot-preview">...\\Steam\\config\\depotcache</strong>
       </div>
 
       <div class="setup-actions">
